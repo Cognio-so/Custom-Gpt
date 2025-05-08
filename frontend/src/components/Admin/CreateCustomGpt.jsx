@@ -135,11 +135,13 @@ When providing code examples:
 
     // Model icons mapping
     const modelIcons = {
-        'gpt-4': <RiOpenaiFill className="text-green-500 mr-2" size={18} />,
-        'gpt-4o-mini': <SiOpenai className="text-green-400 mr-2" size={16} />,
-        'claude': <FaRobot className="text-purple-400 mr-2" size={16} />,
-        'gemini': <SiGooglegemini className="text-blue-400 mr-2" size={16} />,
-        'llama': <BiLogoMeta className="text-blue-500 mr-2" size={18} />
+        'GPT-4o': <RiOpenaiFill className="text-green-500 mr-2" size={18} />,
+        'GPT-4o-mini': <SiOpenai className="text-green-400 mr-2" size={16} />,
+        'Gemini-flash-2.5': <SiGooglegemini className="text-blue-400 mr-2" size={16} />,
+        'Gemini-pro-2.5': <SiGooglegemini className="text-blue-600 mr-2" size={16} />,
+        'Claude 3.5 Haiku': <FaRobot className="text-purple-400 mr-2" size={16} />,
+        'llama3-8b-8192': <BiLogoMeta className="text-blue-500 mr-2" size={18} />,
+        'Llama 4 Scout': <BiLogoMeta className="text-blue-700 mr-2" size={18} />
     };
 
     const handleInputChange = (e) => {
@@ -688,11 +690,13 @@ When providing code examples:
                                     onChange={(e) => setSelectedModel(e.target.value)}
                                     className="w-full bg-white dark:bg-[#262626] border border-gray-400 dark:border-gray-700 rounded-md pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
                                 >
-                                    <option value="gpt-4">GPT-4</option>
-                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                    <option value="claude">Claude</option>
-                                    <option value="gemini">Gemini</option>
-                                    <option value="llama">Llama</option>
+                                    <option value="GPT-4o">GPT-4o</option>
+                                    <option value="GPT-4o-mini">GPT-4o-mini</option>
+                                    <option value="Gemini-flash-2.5">Gemini-flash-2.5</option>
+                                    <option value="Gemini-pro-2.5">Gemini-pro-2.5</option>
+                                    <option value="Claude 3.5 Haiku">Claude 3.5 Haiku</option>
+                                    <option value="llama3-8b-8192">llama3-8b-8192</option>
+                                    <option value="Llama 4 Scout">Llama 4 Scout</option>
                                 </select>
                                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                                     {modelIcons[selectedModel]}
