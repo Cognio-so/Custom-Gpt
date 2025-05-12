@@ -257,12 +257,16 @@ const refreshTokenController = async (req, res) => {
         res.status(200).json({ accessToken: newAccessToken });
 
     } catch (error) {
-         console.error("Refresh Token Error:", error);
-         clearRefreshTokenCookie(res); // Clear invalid refresh token cookie
-         if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-             return res.status(403).json({ message: 'Invalid or expired refresh token' });
-         }
-         return res.status(500).json({ message: 'Server error during token refresh' });
+        console.error("Refresh Token Error:", error);
+        // Include more debug information if needed
+        console.log("Refresh token value length:", refreshToken ? refreshToken.length : 0);
+        console.log("Environment:", process.env.NODE_ENV);
+        
+        clearRefreshTokenCookie(res);
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(403).json({ message: 'Invalid or expired refresh token' });
+        }
+        return res.status(500).json({ message: 'Server error during token refresh' });
     }
 };
 

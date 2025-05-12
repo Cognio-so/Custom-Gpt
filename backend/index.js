@@ -48,10 +48,16 @@ connectDB()
   .then(() => console.log('MongoDB connected at server startup'))
   .catch(err => console.error('Initial MongoDB connection failed:', err));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`); 
-});
+// Instead of app.listen, export the app
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for serverless
+module.exports = app;
 
 
 

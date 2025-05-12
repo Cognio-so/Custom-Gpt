@@ -4,37 +4,13 @@ const mongoose = require("mongoose");
 let dbConnectionPromise = null;
 
 const connectDB = async () => {
+    // Skip if already connected
+    if (mongoose.connection.readyState >= 1) return;
     
-
-    // Return existing connection promise if it exists
-    if (dbConnectionPromise) {
-        return dbConnectionPromise;
-    }
-
-    // Create new connection promise
-    dbConnectionPromise = mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 30000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        // Remove bufferCommands: false to allow buffering
+    return mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000, // Lower timeouts for serverless
+        socketTimeoutMS: 15000,
     });
-    
-    try {
-        const conn = await dbConnectionPromise;        
-        mongoose.connection.on('error', err => {
-            console.error('MongoDB connection error:', err);
-            dbConnectionPromise = null; // Reset on error
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            dbConnectionPromise = null; // Reset on disconnect
-        });
-        
-        return conn;
-    } catch (error) {
-        console.error(`Error: ${error.message}`);
-        process.exit(1);
-    }
 };
 
 module.exports = connectDB;

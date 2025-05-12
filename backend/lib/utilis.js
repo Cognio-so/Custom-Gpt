@@ -30,8 +30,8 @@ const clearRefreshTokenCookie = (res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-        path: '/api/auth/refresh',
-        expires: new Date(0), // Set expiry date to the past
+        path: '/', // Match the path used when setting the cookie
+        expires: new Date(0)
     });
 };
 
