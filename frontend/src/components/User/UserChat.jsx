@@ -497,7 +497,6 @@ const UserChat = () => {
         let streamError = null;
 
         const messageId = Date.now() + 1;
-        console.log(`[Stream ${messageId}] Starting to read stream...`);
 
         try {
             // Initialize streaming message state
@@ -514,7 +513,6 @@ const UserChat = () => {
                 const { done, value } = await reader.read();
 
                 if (done) {
-                    console.log(`[Stream ${messageId}] Stream reader done.`);
                     doneStreaming = true;
                     break;
                 }
@@ -526,7 +524,6 @@ const UserChat = () => {
                     try {
                         const jsonStr = line.substring(6);
                         const parsed = JSON.parse(jsonStr);
-                        console.log(`[Stream ${messageId}] Parsed event:`, parsed);
 
                         if (parsed.type === 'error' || parsed.error) {
                             streamError = parsed.error || parsed.detail || 'Unknown streaming error';
@@ -543,7 +540,6 @@ const UserChat = () => {
                         }
 
                         if (parsed.type === 'done') {
-                            console.log(`[Stream ${messageId}] Done event received.`);
                             doneStreaming = true;
                             break;
                         }
@@ -560,7 +556,6 @@ const UserChat = () => {
 
                         if (parsed.type === 'sources_info') {
                             sourcesInfo = parsed.data;
-                            console.log(`[Stream ${messageId}] Sources info:`, sourcesInfo);
                             buffer += `\n\n[Sources Retrieved: ${sourcesInfo.documents_retrieved_count} documents, ${sourcesInfo.retrieval_time_ms}ms]`;
                         }
                     } catch (e) {
@@ -584,7 +579,6 @@ const UserChat = () => {
             }));
 
             await saveMessageToHistory(buffer, 'assistant');
-            console.log(`[Stream ${messageId}] Saved final content:`, buffer);
         } catch (err) {
             console.error(`[Stream ${messageId}] Error reading stream:`, err);
             buffer = `Error reading response stream: ${err.message}`;
@@ -600,7 +594,6 @@ const UserChat = () => {
             await saveMessageToHistory(buffer, 'assistant');
         } finally {
             setLoading(prev => ({ ...prev, message: false }));
-            console.log(`[Stream ${messageId}] Stream processing complete.`);
         }
     };
 

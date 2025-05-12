@@ -44,7 +44,6 @@ function decrypt(text) {
     try {
         // Check if the text is in the correct format
         if (!text || !text.includes(':')) {
-            console.log("Invalid encrypted text format");
             return '';
         }
 
@@ -61,7 +60,6 @@ function decrypt(text) {
         
         // Ensure IV is correct length
         if (iv.length !== IV_LENGTH) {
-            console.log("Invalid IV length in encrypted data");
             return '';
         }
 
