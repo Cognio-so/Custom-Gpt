@@ -258,9 +258,6 @@ const refreshTokenController = async (req, res) => {
 
     } catch (error) {
         console.error("Refresh Token Error:", error);
-        // Include more debug information if needed
-        console.log("Refresh token value length:", refreshToken ? refreshToken.length : 0);
-        console.log("Environment:", process.env.NODE_ENV);
         
         clearRefreshTokenCookie(res);
         if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
