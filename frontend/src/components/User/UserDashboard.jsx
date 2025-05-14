@@ -314,11 +314,11 @@ const UserDashboard = () => {
 
     return (
         <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'}`}>
-            <div className="mb-4 md:mb-6 flex-shrink-0 flex items-center justify-between">
-                <h1 className="text-xl sm:text-2xl font-bold">User Dashboard</h1>
+            <div className="mb-4 md:mb-6 flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="text-xl sm:text-2xl font-bold text-center sm:text-left mb-3 sm:mb-0">User Dashboard</h1>
                 <button
                     onClick={toggleTheme}
-                    className={`p-2 rounded-full transition-colors ${
+                    className={`p-2 rounded-full transition-colors self-center sm:self-auto ${
                         isDarkMode 
                             ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

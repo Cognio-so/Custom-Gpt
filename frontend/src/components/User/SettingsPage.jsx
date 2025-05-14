@@ -417,7 +417,7 @@ const SettingsPage = () => {
     <div className={`flex flex-col h-full min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'
       }`}>
       <div className="p-4 sm:p-6 md:p-8 lg:p-10 border-b border-gray-200 dark:border-gray-700">
-        <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-center sm:text-left">Settings</h1>
       </div>
 
       <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-10 overflow-y-auto scrollbar-hide">

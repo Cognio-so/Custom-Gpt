@@ -454,7 +454,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                     </div>
                                     <button
                                         onClick={() => setShowCreateGpt(true)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md"
+                                        className="bg-black dark:bg-white text-white dark:text-black p-2 rounded-md"
                                     >
                                         <FiPlus size={24} />
                                     </button>

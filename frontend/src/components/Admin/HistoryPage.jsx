@@ -330,8 +330,8 @@ const HistoryPage = () => {
 
       {/* Header section */}
       <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-300 dark:border-gray-800">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Activity History</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track actions and changes across your workspace</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white text-center sm:text-left">Activity History</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center sm:text-left">Track actions and changes across your workspace</p>
       </div>
 
       {/* Controls section */}

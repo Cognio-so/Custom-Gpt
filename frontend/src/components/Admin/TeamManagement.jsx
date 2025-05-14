@@ -479,8 +479,8 @@ const TeamManagement = () => {
         <div className="flex flex-col h-full bg-gray-50 dark:bg-black text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             <style>{scrollbarHideStyles}</style>
             <div className="mb-6 flex-shrink-0">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Team Management</h1>
-                <p className="text-gray-600 dark:text-gray-400">Manage your team members, permissions, and GPT assignments.</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1 text-center sm:text-left">Team Management</h1>
+                <p className="text-gray-600 dark:text-gray-400 text-center sm:text-left">Manage your team members, permissions, and GPT assignments.</p>
             </div>
 
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0">
