@@ -276,7 +276,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                 {!showCreateGpt ? (
                     <>
                         {/* Header Section */}
-                        <header className="bg-white dark:bg-gray-800 px-4 sm:px-8 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm">
+                        <header className="bg-white dark:bg-black px-4 sm:px-8 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm">
                             {/* Desktop Header */}
                             <div className="hidden sm:flex items-center justify-between">
                                 <div className="flex items-center">
@@ -378,7 +378,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         </header>
 
                         {/* Main Content Area - With hidden scrollbar styling */}
-                        <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900 scrollbar-hide [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                        <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-gray-50 dark:bg-black scrollbar-hide [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                             {searchTerm && !hasSearchResults ? (
                                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                                     No agents found for "{searchTerm}"

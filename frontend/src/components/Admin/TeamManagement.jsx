@@ -476,7 +476,7 @@ const TeamManagement = () => {
     }
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-black dark:text-white p-4 sm:p-6 overflow-hidden">
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-black text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             <style>{scrollbarHideStyles}</style>
             <div className="mb-6 flex-shrink-0">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Team Management</h1>
