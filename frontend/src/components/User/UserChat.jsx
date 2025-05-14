@@ -654,6 +654,14 @@ const UserChat = () => {
                 url && (url.startsWith('http://') || url.startsWith('https://'))
             ) || [];
 
+            // Get API keys from localStorage
+            let apiKeys = {};
+            try {
+                apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+            } catch (e) {
+                console.warn("Failed to parse API keys from localStorage");
+            }
+
             const backendUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
             const payload = {
@@ -667,9 +675,9 @@ const UserChat = () => {
                     instructions: customGpt.instructions || "",
                     capabilities: customGpt.capabilities || {},
                     use_hybrid_search: useHybridSearch
-                }
+                },
+                api_keys: apiKeys // Add API keys to the payload
             };
-
 
             const response = await fetch(`${backendUrl}/gpt-opened`, {
                 method: 'POST',

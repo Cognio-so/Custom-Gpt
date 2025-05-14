@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import axios from 'axios';
-import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo, FiFolder, FiFolderPlus } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo, FiFolder, FiFolderPlus, FiGlobe } from 'react-icons/fi';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
@@ -27,13 +26,17 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMod
         className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 transition-all shadow-md hover:shadow-lg flex flex-col cursor-pointer group"
         onClick={() => onNavigate(`/admin/chat/${gpt._id}`)}
     >
-        <div className="h-24 sm:h-32 bg-gradient-to-br from-gray-100 to-gray-300 dark:from-gray-700 dark:to-gray-900 relative flex-shrink-0 overflow-hidden">
+        <div className="h-32 sm:h-36 bg-gradient-to-br from-gray-100 to-gray-300 dark:from-gray-700 dark:to-gray-900 relative flex-shrink-0 overflow-hidden">
             {gpt.imageUrl ? (
                 <img
                     src={gpt.imageUrl}
                     alt={gpt.name}
-                    className="w-full h-full object-cover opacity-80 dark:opacity-70 group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover object-center opacity-90 dark:opacity-80 group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
+                    onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/img.png'; 
+                    }}
                 />
             ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50/50 to-purple-100/50 dark:from-blue-900/30 dark:to-purple-900/30">
@@ -76,6 +79,14 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMod
             </div>
 
             <p className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm h-10 sm:h-12 line-clamp-2 sm:line-clamp-3 mb-3">{gpt.description}</p>
+            
+            {gpt.capabilities?.webBrowsing && (
+                <div className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 mb-1">
+                    <FiGlobe size={12} />
+                    <span>Web search</span>
+                </div>
+            )}
+            
             <div className="mt-auto pt-2 border-t border-gray-100 dark:border-gray-700 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
                 <span>Created: {formatDate(gpt.createdAt)}</span>
                 {gpt.knowledgeFiles?.length > 0 && (
@@ -114,6 +125,7 @@ const CollectionsPage = () => {
             const response = await axiosInstance.get(`/api/custom-gpts`, { withCredentials: true });
 
             if (response.data.success && response.data.customGpts) {
+                // Don't transform the response - keep the original structure
                 setCustomGpts(response.data.customGpts);
                 // Extract unique folders from GPTs
                 const uniqueFolders = [...new Set(response.data.customGpts

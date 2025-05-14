@@ -11,7 +11,7 @@ import {
   IoChatbubblesOutline
 } from 'react-icons/io5';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext'; // Import useTheme
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { axiosInstance } from '../../api/axiosInstance';
 
@@ -21,7 +21,7 @@ import { teamMembers } from './teamData';
 const HistoryPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDarkMode } = useTheme(); // Get theme state
+  const { isDarkMode } = useTheme();
   const { user } = useAuth();
 
   // Initialize view type from URL parameter or default to 'personal'
@@ -46,6 +46,7 @@ const HistoryPage = () => {
   });
 
   const filterDropdownRef = useRef(null);
+  const filterButtonRef = useRef(null); // NEW: Ref for the filter button to get its position
 
   // Fetch real chat history data
   useEffect(() => {
@@ -380,6 +381,7 @@ const HistoryPage = () => {
 
             <div className="relative" ref={filterDropdownRef}>
               <button
+                ref={filterButtonRef} // NEW: Attach ref to filter button
                 onClick={() => setFilterOpen(!filterOpen)}
                 className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
               >
@@ -390,7 +392,18 @@ const HistoryPage = () => {
 
               {/* Filter Dropdown */}
               {filterOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-2xl z-20 p-4">
+                <div
+                  className="absolute w-60 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-2xl z-20 p-4"
+                  style={{
+                    // NEW: Dynamic positioning based on available space
+                    right: 0,
+                    top: filterButtonRef.current &&
+                      window.innerHeight - filterButtonRef.current.getBoundingClientRect().bottom < 300 &&
+                      filterButtonRef.current.getBoundingClientRect().top > 300
+                      ? `-${300 + 8}px` // Position above (approx dropdown height + margin)
+                      : 'calc(100% + 8px)', // Position below
+                  }}
+                >
                   <div className="mb-4">
                     <h3 className="text-gray-700 dark:text-gray-300 font-medium text-sm mb-2">Action Types</h3>
                     <div className="space-y-1.5">
@@ -461,7 +474,6 @@ const HistoryPage = () => {
                   key={activity.id}
                   className={`relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 rounded-lg p-4 ml-4 transition-colors ${(activity.type === 'user_summary' || activity.type === 'chat') ? 'cursor-pointer group' : ''
                     } ${activity.type === 'user_summary' ? '' : activity.isSecondaryUserConvo ? 'ml-8 border-l-4 border-l-blue-500/30' : ''}`}
-
                   onClick={() => {
                     if (activity.type === 'user_summary') {
                       navigate(`/admin/history/user/${activity.user.id}?view=${viewType}`);
@@ -496,7 +508,6 @@ const HistoryPage = () => {
                             }}
                           >
                             {viewType === 'personal' ? 'You' : activity.user?.name || 'Team Member'}
-
                             {activity.type === 'user_summary' && activity.totalUserConversations > 1 && (
                               <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
                                 ({activity.totalUserConversations} conversations)
@@ -514,7 +525,6 @@ const HistoryPage = () => {
 
                       <p className="text-sm">
                         <span className="text-gray-700 dark:text-gray-300">{activity.action}</span>
-
                         {activity.details && (
                           <> - <span className="font-medium text-gray-900 dark:text-white">{activity.details}</span></>
                         )}

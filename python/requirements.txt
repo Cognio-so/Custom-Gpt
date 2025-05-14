@@ -65,3 +65,11 @@ groq>=0.4.0  # For Groq API (Llama models)
 
 # Retry utilities for API rate limits
 tenacity>=8.2.0
+
+# Add this to requirements.txt for image processing
+Pillow>=10.0.0  # Required for image processing in rag.py
+
+# Scheduling
+apscheduler>=3.10.1
+# Optional - uncomment if needed
+llama-cpp-python>=0.2.0  # Uncomment if using local Llama models

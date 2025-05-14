@@ -144,6 +144,14 @@ const AdminChat = () => {
             ) || [];
 
             const useHybridSearch = gptData.capabilities?.hybridSearch || false;
+            
+            // Get API keys from localStorage
+            let apiKeys = {};
+            try {
+                apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+            } catch (e) {
+                console.warn("Failed to parse API keys from localStorage");
+            }
 
             const response = await axios.post(
                 `${PYTHON_URL}/gpt-opened`,
@@ -153,12 +161,13 @@ const AdminChat = () => {
                     gpt_id: gptData._id,
                     file_urls: fileUrls,
                     use_hybrid_search: useHybridSearch,
-                    gpt_schema: {
+                    schema: {
                         model: gptData.model,
                         instructions: gptData.instructions,
                         capabilities: gptData.capabilities,
                         use_hybrid_search: useHybridSearch
-                    }
+                    },
+                    api_keys: apiKeys // Add API keys to the payload
                 },
                 {
                     headers: {

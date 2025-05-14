@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     FiSearch,
     FiFilter,
@@ -22,11 +22,11 @@ import EditPermissionsModal from './EditPermissionsModal';
 import { axiosInstance } from '../../api/axiosInstance';
 import { toast } from 'react-toastify';
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext'; // Import useAuth
+import { useAuth } from '../../context/AuthContext';
+import { AutoSizer, List } from 'react-virtualized';
+import debounce from 'lodash/debounce';
 
-// API URL from environment variables
-
-// List of departments for filter dropdown (static data since backend doesn't have this info)
+// List of departments for filter dropdown
 const departments = [
     'All Departments',
     'Product',
@@ -36,6 +36,48 @@ const departments = [
     'Sales',
     'Customer Support'
 ];
+
+// Memoized MobileTeamMemberCard
+const MobileTeamMemberCard = React.memo(({ member, onViewDetails, isCurrentUser }) => (
+    <div
+        className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-3 ${isCurrentUser ? 'opacity-80' : 'cursor-pointer'}`}
+        onClick={() => !isCurrentUser && onViewDetails(member)}
+    >
+        <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center mr-3">
+                    <FiUser className="text-gray-600 dark:text-gray-300" />
+                </div>
+                <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">{member.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
+                    {isCurrentUser && (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full mt-1 inline-block">
+                            You
+                        </span>
+                    )}
+                </div>
+            </div>
+            {isCurrentUser ? (
+                <span className="text-xs text-gray-400 italic">Current user</span>
+            ) : (
+                <FiChevronRight className="text-gray-400 dark:text-gray-500" />
+            )}
+        </div>
+        <div className="text-sm space-y-1">
+            <p><strong className="text-gray-600 dark:text-gray-300">Role:</strong> {member.role}</p>
+            <p><strong className="text-gray-600 dark:text-gray-300">Department:</strong> {member.department}</p>
+            <p><strong className="text-gray-600 dark:text-gray-300">Status:</strong>
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${member.status === 'Active'
+                    ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                    : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'}`}>
+                    {member.status}
+                </span>
+            </p>
+            <p><strong className="text-gray-600 dark:text-gray-300">GPTs:</strong> {member.assignedGPTs}</p>
+        </div>
+    </div>
+));
 
 const TeamManagement = () => {
     const [teamMembers, setTeamMembers] = useState([]);
@@ -60,7 +102,7 @@ const TeamManagement = () => {
     const [showEditPermissionsModal, setShowEditPermissionsModal] = useState(false);
     const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState(null);
     const { isDarkMode } = useTheme();
-    const { user } = useAuth(); // Get current user from auth context
+    const { user } = useAuth();
     const actionsMenuRef = useRef(null);
     const departmentFilterRef = useRef(null);
     const statusFilterRef = useRef(null);
@@ -68,8 +110,9 @@ const TeamManagement = () => {
     const [pageSize, setPageSize] = useState(10);
     const [cachedMembers, setCachedMembers] = useState({});
     const [totalMembers, setTotalMembers] = useState(0);
+    const abortControllerRef = useRef(null);
 
-    // Add responsive detection
+    // Responsive detection
     useEffect(() => {
         const handleResize = () => {
             setIsMobileView(window.innerWidth < 768);
@@ -79,7 +122,7 @@ const TeamManagement = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Improved error handling for API calls
+    // Error handling
     const handleApiError = (error, defaultMessage) => {
         console.error(defaultMessage, error);
         const errorMessage = error.response?.data?.message || defaultMessage;
@@ -87,114 +130,129 @@ const TeamManagement = () => {
         return errorMessage;
     };
 
-    // Function to format date (should be defined before use or moved outside component)
+    // Format date
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
         });
     };
 
-    // Fetch team data with GPT counts
-    const fetchTeamData = useCallback(async (refresh = false) => {
-        if (!refresh && teamMembers.length > 0) return; // Don't reload if data exists
+    // Debounced fetchTeamData
+    const debouncedFetchTeamData = useMemo(
+        () =>
+            debounce(async (pageNum, refresh) => {
+                if (abortControllerRef.current) {
+                    abortControllerRef.current.abort();
+                }
+                abortControllerRef.current = new AbortController();
 
-        try {
-            setLoading(true);
-            // Make a single API call to get users with their GPT counts
-            const response = await axiosInstance.get(`/api/auth/users/with-gpt-counts?page=${page}&limit=${pageSize}`, {
-                withCredentials: true
-            });
+                if (!refresh && cachedMembers[pageNum]) {
+                    setTeamMembers(cachedMembers[pageNum]);
+                    setLoading(false);
+                    return;
+                }
 
-            if (response.data && response.data.users) {
-                const formattedUsers = response.data.users.map(user => {
-                    const isActive = user.lastActive
-                        ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000
-                        : false;
+                try {
+                    setLoading(true);
+                    const response = await axiosInstance.get(`/api/auth/users/with-gpt-counts?page=${pageNum}&limit=${pageSize}`, {
+                        withCredentials: true,
+                        signal: abortControllerRef.current.signal,
+                    });
 
-                    return {
-                        id: user._id,
-                        name: user.name,
-                        email: user.email,
-                        role: user.role || 'Employee',
-                        department: user.department || 'Not Assigned',
-                        joined: formatDate(user.createdAt),
-                        lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
-                        status: isActive ? 'Active' : 'Inactive',
-                        assignedGPTs: user.gptCount || 0 // Use count from combined response
-                    };
-                });
+                    if (response.data && response.data.users) {
+                        const formattedUsers = response.data.users.map(user => {
+                            const isActive = user.lastActive
+                                ? (new Date() - new Date(user.lastActive)) < 24 * 60 * 60 * 1000
+                                : false;
 
-                setTeamMembers(formattedUsers);
-                setTotalMembers(response.data.total || formattedUsers.length);
-                setError(null);
+                            return {
+                                id: user._id,
+                                name: user.name,
+                                email: user.email,
+                                role: user.role || 'Employee',
+                                department: user.department || 'Not Assigned',
+                                joined: formatDate(user.createdAt),
+                                lastActive: user.lastActive ? formatDate(user.lastActive) : 'Never',
+                                status: isActive ? 'Active' : 'Inactive',
+                                assignedGPTs: user.gptCount || 0,
+                            };
+                        });
 
-                // Cache the data
-                setCachedMembers(prev => ({
-                    ...prev,
-                    [page]: formattedUsers
-                }));
-            }
-        } catch (err) {
-            console.error("Error fetching team members:", err);
-            setError("Failed to load team data. Please check your connection.");
-        } finally {
-            setLoading(false);
-        }
-    }, [page, pageSize, teamMembers.length]);
+                        setTeamMembers(formattedUsers);
+                        setTotalMembers(response.data.total || formattedUsers.length);
+                        setError(null);
+
+                        setCachedMembers(prev => ({
+                            ...prev,
+                            [pageNum]: formattedUsers,
+                        }));
+                    }
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    console.error("Error fetching team members:", err);
+                    setError("Failed to load team data. Please check your connection.");
+                } finally {
+                    setLoading(false);
+                }
+            }, 300),
+        [pageSize, cachedMembers]
+    );
+
+    // Fetch team data
+    const fetchTeamData = useCallback(
+        async (refresh = false) => {
+            debouncedFetchTeamData(page, refresh);
+        },
+        [page, debouncedFetchTeamData]
+    );
 
     // Initial mount effect
     useEffect(() => {
-        // Check if we have cached data for this page
-        if (cachedMembers[page]) {
-            setTeamMembers(cachedMembers[page]);
-        } else {
-            fetchTeamData();
-        }
-    }, [fetchTeamData, page, cachedMembers]);
-
-    // Reduced polling frequency
-    useEffect(() => {
-        // Only set up interval if component is mounted and visible
-        const interval = setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                fetchTeamData(true); // Force refresh
+        fetchTeamData();
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
             }
-        }, 30000); // Reduced from 10s to 30s
-
-        return () => clearInterval(interval);
+        };
     }, [fetchTeamData]);
 
-    // IMPROVEMENT 3: Handle GPT assignment changes more efficiently
+    // Dynamic polling
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible' && !loading) {
+                fetchTeamData(true);
+            }
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, [fetchTeamData, loading]);
+
+    // Handle GPT assignment changes
     const handleGptAssignmentChange = useCallback((memberId) => {
-        // Convert to standard pattern if it's a MongoDB ObjectId string
-        if (typeof memberId === 'string' && /^[0-9a-fA-F]{24}$/.test(memberId)) {
-        } else if (typeof memberId !== 'string') {
-            console.error("Invalid member ID type:", typeof memberId);
+        if (typeof memberId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(memberId)) {
+            console.error("Invalid member ID:", memberId);
             return;
         }
 
         const fetchUpdatedCount = async () => {
             try {
-
-                // Get the updated count for this user
                 const response = await axiosInstance.get(`/api/auth/users/${memberId}/gpt-count`, {
-                    withCredentials: true
+                    withCredentials: true,
                 });
 
                 if (response.data && typeof response.data.count !== 'undefined') {
+                    setTeamMembers(prev =>
+                        prev.map(member =>
+                            member.id === memberId
+                                ? { ...member, assignedGPTs: response.data.count }
+                                : member
+                        )
+                    );
 
-                    // Update this member's GPT count in the state
-                    setTeamMembers(prev => prev.map(member =>
-                        member.id === memberId
-                            ? { ...member, assignedGPTs: response.data.count }
-                            : member
-                    ));
-
-                    // Also update the count in cache
                     setCachedMembers(prev => {
                         const newCache = { ...prev };
                         Object.keys(newCache).forEach(pageKey => {
@@ -208,16 +266,12 @@ const TeamManagement = () => {
                         });
                         return newCache;
                     });
-                } else {
-                    console.warn("Invalid response format for GPT count:", response.data);
                 }
             } catch (err) {
                 console.error("Error updating GPT count:", err);
-                // Don't show a toast here - the user has already closed the modal
             }
         };
 
-        // Call the async function
         fetchUpdatedCount();
     }, []);
 
@@ -226,7 +280,7 @@ const TeamManagement = () => {
         const fetchPendingInvites = async () => {
             try {
                 const response = await axiosInstance.get(`/api/auth/pending-invites/count`, {
-                    withCredentials: true
+                    withCredentials: true,
                 });
 
                 if (response.data && response.data.count !== undefined) {
@@ -234,28 +288,32 @@ const TeamManagement = () => {
                 }
             } catch (err) {
                 console.error("Error fetching pending invites count:", err);
-                // Keep current count or set to 0
             }
         };
 
         fetchPendingInvites();
     }, []);
 
-    const filteredMembers = teamMembers.filter(member => {
-        const matchesSearch =
-            member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (member.department && member.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (member.position && member.position.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Memoized filtered members
+    const filteredMembers = useMemo(() => {
+        return teamMembers.filter(member => {
+            const matchesSearch =
+                member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (member.department && member.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (member.position && member.position.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        const matchesDepartment = selectedDepartment === 'All Departments' ||
-            member.department === selectedDepartment;
+            const matchesDepartment =
+                selectedDepartment === 'All Departments' ||
+                member.department === selectedDepartment;
 
-        const matchesStatus = selectedStatus === 'All Status' ||
-            member.status === selectedStatus;
+            const matchesStatus =
+                selectedStatus === 'All Status' ||
+                member.status === selectedStatus;
 
-        return matchesSearch && matchesDepartment && matchesStatus;
-    });
+            return matchesSearch && matchesDepartment && matchesStatus;
+        });
+    }, [teamMembers, searchTerm, selectedDepartment, selectedStatus]);
 
     const toggleActionsMenu = (memberId) => {
         setShowActionsMenu(showActionsMenu === memberId ? null : memberId);
@@ -268,14 +326,11 @@ const TeamManagement = () => {
     const handleAssignGpts = (member) => {
         setSelectedMemberForGpts(member);
         setShowAssignGptsModal(true);
-        setShowActionsMenu(null); // Close the actions menu
+        setShowActionsMenu(null);
     };
 
     const handleViewMemberDetails = (member) => {
-        // Don't allow viewing details of the current user
-        if (user?._id === member.id) {
-            return;
-        }
+        if (user?._id === member.id) return;
         setSelectedMemberForDetails(member);
         setShowDetailsModal(true);
     };
@@ -286,39 +341,40 @@ const TeamManagement = () => {
             display: none;
         }
         .hide-scrollbar {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* NEW: Apply hide-scrollbar to react-virtualized List */
+        .ReactVirtualized__List::-webkit-scrollbar {
+            display: none;
+        }
+        .ReactVirtualized__List {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     `;
 
-    // Email team member function
     const handleEmailTeamMember = async (email) => {
-        // Open default email client with recipient's address
         window.location.href = `mailto:${email}`;
         setShowActionsMenu(null);
     };
 
-    // Edit permissions function
     const handleEditPermissions = (member) => {
         setSelectedMemberForPermissions(member);
         setShowEditPermissionsModal(true);
-        setShowActionsMenu(null); // Close the actions menu
+        setShowActionsMenu(null);
     };
 
-    // Handle remove team member
     const handleRemoveTeamMember = async (memberId) => {
         if (window.confirm("Are you sure you want to remove this team member? All their data including chat histories and assignments will be permanently deleted.")) {
             try {
                 setLoading(true);
                 const response = await axiosInstance.delete(`/api/auth/users/${memberId}`, {
-                    withCredentials: true
+                    withCredentials: true,
                 });
 
                 if (response.data.success) {
-                    // Remove user from local state
                     setTeamMembers(prev => prev.filter(member => member.id !== memberId));
-
-                    // Also update the cache
                     setCachedMembers(prev => {
                         const newCache = { ...prev };
                         for (const pageKey in newCache) {
@@ -328,10 +384,7 @@ const TeamManagement = () => {
                         }
                         return newCache;
                     });
-
-                    // Update the total count
                     setTotalMembers(prev => Math.max(0, prev - 1));
-
                     toast.success("Team member and all associated data removed successfully");
                 }
             } catch (err) {
@@ -345,7 +398,6 @@ const TeamManagement = () => {
         }
     };
 
-    // Add function to handle permission updates
     const handlePermissionsUpdated = (updatedMember) => {
         setTeamMembers(prev =>
             prev.map(member =>
@@ -354,51 +406,21 @@ const TeamManagement = () => {
         );
     };
 
-    // Mobile card view for team members
-    const MobileTeamMemberCard = ({ member }) => (
-        <div
-            className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-3 ${user?._id === member.id ? 'opacity-80' : 'cursor-pointer'
-                }`}
-            onClick={() => user?._id !== member.id && handleViewMemberDetails(member)}
-        >
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center mr-3">
-                        <FiUser className="text-gray-600 dark:text-gray-300" />
-                    </div>
-                    <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">{member.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
-                        {user?._id === member.id && (
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full mt-1 inline-block">
-                                You
-                            </span>
-                        )}
-                    </div>
-                </div>
-                {user?._id !== member.id ? (
-                    <FiChevronRight className="text-gray-400 dark:text-gray-500" />
-                ) : (
-                    <span className="text-xs text-gray-400 italic">Current user</span>
-                )}
+    // Virtualized row renderer for mobile view
+    const renderMobileRow = ({ index, key, style }) => {
+        const member = filteredMembers[index];
+        return (
+            <div key={key} style={style}>
+                <MobileTeamMemberCard
+                    member={member}
+                    onViewDetails={handleViewMemberDetails}
+                    isCurrentUser={user?._id === member.id}
+                />
             </div>
-            <div className="text-sm space-y-1">
-                <p><strong className="text-gray-600 dark:text-gray-300">Role:</strong> {member.role}</p>
-                <p><strong className="text-gray-600 dark:text-gray-300">Department:</strong> {member.department}</p>
-                <p><strong className="text-gray-600 dark:text-gray-300">Status:</strong>
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${member.status === 'Active'
-                            ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'
-                        }`}>
-                        {member.status}
-                    </span>
-                </p>
-                <p><strong className="text-gray-600 dark:text-gray-300">GPTs:</strong> {member.assignedGPTs}</p>
-            </div>
-        </div>
-    );
+        );
+    };
 
-    // Add pagination controls
+    // Pagination controls
     const renderPagination = () => {
         const totalPages = Math.ceil(totalMembers / pageSize);
 
@@ -424,9 +446,30 @@ const TeamManagement = () => {
         );
     };
 
-    if (loading) {
-        return <div className="flex justify-center items-center h-screen bg-white dark:bg-black"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div></div>;
-    }
+    // Skeleton loading
+    const renderSkeleton = () => (
+        <div className="space-y-3">
+            {Array.from({ length: pageSize }).map((_, index) => (
+                <div key={index} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 animate-pulse">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 mr-3"></div>
+                            <div>
+                                <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24 mb-2"></div>
+                                <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                            </div>
+                        </div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-12"></div>
+                    </div>
+                    <div className="text-sm space-y-2">
+                        <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-40"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-48"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
 
     if (error) {
         return <div className="flex justify-center items-center h-screen bg-white dark:bg-black text-red-500 p-4">{error}</div>;
@@ -507,26 +550,31 @@ const TeamManagement = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-black/80 dark:bg-white hover:bg-black/80 dark:hover:bg-white/70 text-white dark:text-black rounded-lg font-medium text-sm transition-colors relative"
                     >
                         Invite Member
-                        {pendingInvitesCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                                {pendingInvitesCount}
-                            </span>
-                        )}
                     </button>
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto hide-scrollbar -mx-4 sm:-mx-6 px-4 sm:px-6">
-                {isMobileView ? (
-                    <div className="space-y-3">
-                        {filteredMembers.length > 0 ? (
-                            filteredMembers.map(member => (
-                                <MobileTeamMemberCard key={member.id} member={member} />
-                            ))
-                        ) : (
-                            <p className="text-center text-gray-500 dark:text-gray-400 py-8">No team members found matching your criteria.</p>
-                        )}
-                    </div>
+                {loading ? (
+                    renderSkeleton()
+                ) : isMobileView ? (
+                    filteredMembers.length > 0 ? (
+                        <AutoSizer>
+                            {({ height, width }) => (
+                                <List
+                                    className="hide-scrollbar" // NEW: Ensure List respects hide-scrollbar
+                                    height={height}
+                                    width={width}
+                                    rowCount={filteredMembers.length}
+                                    rowHeight={150}
+                                    rowRenderer={renderMobileRow}
+                                    overscanRowCount={5}
+                                />
+                            )}
+                        </AutoSizer>
+                    ) : (
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-8">No team members found matching your criteria.</p>
+                    )
                 ) : (
                     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -562,9 +610,8 @@ const TeamManagement = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-700 dark:text-gray-300">{member.assignedGPTs}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'Active'
-                                                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                                                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
-                                                }`}>
+                                                ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                                : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'}`}>
                                                 {member.status}
                                             </span>
                                         </td>
@@ -595,10 +642,8 @@ const TeamManagement = () => {
                 )}
             </div>
 
-            {/* Add pagination at the bottom */}
             {!loading && !error && filteredMembers.length > 0 && renderPagination()}
 
-            {/* Render action menus with fixed position - FIX FOR THREEDDOTS DROPDOWN MENU ALIGNMENT */}
             {showActionsMenu && filteredMembers.map((member) => (
                 member.id === showActionsMenu && user?._id !== member.id && (
                     <div
@@ -608,18 +653,25 @@ const TeamManagement = () => {
                             if (node) {
                                 const buttonRect = document.querySelector(`[data-member-id="${member.id}"]`)?.getBoundingClientRect();
                                 if (buttonRect) {
-                                    // Improved positioning for the dropdown with better alignment
+                                    const menuHeight = 160; // Approximate height of the menu (adjust based on actual height)
+                                    const viewportHeight = window.innerHeight;
                                     const isNearRightEdge = window.innerWidth - buttonRect.right < 200;
+                                    const spaceBelow = viewportHeight - buttonRect.bottom;
+                                    const showAbove = spaceBelow < menuHeight && buttonRect.top > menuHeight;
 
-                                    node.style.top = `${buttonRect.bottom + window.scrollY + 5}px`;
+                                    // NEW: Position menu above if there's not enough space below
+                                    if (showAbove) {
+                                        node.style.top = `${buttonRect.top + window.scrollY - menuHeight - 5}px`;
+                                    } else {
+                                        node.style.top = `${buttonRect.bottom + window.scrollY + 5}px`;
+                                    }
 
-                                    // If near the right edge of the screen, align right edge of dropdown with button
                                     if (isNearRightEdge) {
                                         node.style.right = `${window.innerWidth - buttonRect.right - window.scrollX}px`;
                                         node.style.left = 'auto';
                                     } else {
-                                        // Otherwise center the dropdown below the button
                                         node.style.left = `${buttonRect.left + window.scrollX - 60}px`;
+                                        node.style.right = 'auto';
                                     }
                                 }
                             }
@@ -649,7 +701,6 @@ const TeamManagement = () => {
                 )
             ))}
 
-            {/* Modals */}
             {showAssignGptsModal && selectedMemberForGpts && (
                 <AssignGptsModal
                     isOpen={showAssignGptsModal}
@@ -687,4 +738,4 @@ const TeamManagement = () => {
     );
 };
 
-export default TeamManagement; 
+export default TeamManagement;

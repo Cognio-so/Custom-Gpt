@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { FiSearch, FiMessageSquare, FiChevronDown, FiChevronUp, FiXCircle, FiHeart, FiFolder, FiPlus } from 'react-icons/fi';
+import { FiSearch, FiMessageSquare, FiChevronDown, FiChevronUp, FiXCircle, FiHeart, FiFolder, FiPlus, FiSun, FiMoon } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
@@ -108,7 +108,7 @@ const UserDashboard = () => {
     const [showSortOptions, setShowSortOptions] = useState(false);
     const sortDropdownRef = useRef(null);
     const navigate = useNavigate();
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const [folders, setFolders] = useState(['All']);
     const [selectedFolder, setSelectedFolder] = useState('All');
     const [showMoveModal, setShowMoveModal] = useState(false);
@@ -313,10 +313,21 @@ const UserDashboard = () => {
     }
 
     return (
-        <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'
-            }`}>
-            <div className="mb-4 md:mb-6 flex-shrink-0 text-center md:text-left">
+        <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'}`}>
+            <div className="mb-4 md:mb-6 flex-shrink-0 flex items-center justify-between">
                 <h1 className="text-xl sm:text-2xl font-bold">User Dashboard</h1>
+                <button
+                    onClick={toggleTheme}
+                    className={`p-2 rounded-full transition-colors ${
+                        isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                </button>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-4 flex-shrink-0">
@@ -410,7 +421,7 @@ const UserDashboard = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar-dark dark:custom-scrollbar">
+            <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
                 {error ? (
                     <div className={`flex flex-col items-center justify-center h-full text-center ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
                         <FiXCircle size={40} className="mb-4 opacity-70" />
