@@ -369,7 +369,7 @@ const CollectionsPage = () => {
                 {/* Create Button */}
                 <button
                     onClick={handleCreateNew}
-                    className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white hover:bg-gray-100 dark:hover:bg-gray-700 text-black dark:text- rounded-lg font-medium text-sm transition-colors flex-shrink-0 whitespace-nowrap"
+                    className="flex items-center gap-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg font-medium text-sm transition-colors flex-shrink-0 whitespace-nowrap"
                 >
                     <FiPlus size={18} /> Create New GPT
                 </button>
