@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useMemo, lazy, Suspense, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
 const CreateCustomGpt = lazy(() => import('./CreateCustomGpt'));
-import { FiSearch, FiChevronDown, FiChevronUp, FiMenu, FiPlus, FiGlobe, FiUsers, FiMessageSquare, FiGrid, FiList } from 'react-icons/fi';
+const MoveToFolderModal = lazy(() => import('./MoveToFolderModal'));
+import { FiSearch, FiChevronDown, FiChevronUp, FiMenu, FiPlus, FiGlobe, FiUsers, FiMessageSquare, FiGrid, FiList, FiEdit, FiTrash2, FiFolderPlus } from 'react-icons/fi';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
@@ -11,6 +12,7 @@ import AgentCard from './AgentCard';
 import CategorySection from './CategorySection';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
+import { toast } from 'react-toastify';
 
 const defaultAgentImage = '/img.png';
 
@@ -24,7 +26,7 @@ const modelIcons = {
 };
 
 // Enhanced Agent Card component
-const EnhancedAgentCard = ({ agent, onClick }) => {
+const EnhancedAgentCard = ({ agent, onClick, onEdit, onDelete, onMoveToFolder }) => {
     const { isDarkMode } = useTheme();
     
     return (
@@ -49,6 +51,31 @@ const EnhancedAgentCard = ({ agent, onClick }) => {
                         <span className={`text-3xl sm:text-4xl ${isDarkMode ? 'text-white/30' : 'text-gray-500/40'}`}>{agent.name.charAt(0)}</span>
                     </div>
                 )}
+                
+                {/* Action Buttons - Added for edit, delete and move to folder */}
+                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onMoveToFolder(agent); }}
+                        className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-green-500 hover:text-white dark:hover:bg-green-700/80 transition-colors shadow"
+                        title="Move to Folder"
+                    >
+                        <FiFolderPlus size={14} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(agent.id); }}
+                        className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-blue-500 hover:text-white dark:hover:bg-blue-700/80 transition-colors shadow"
+                        title="Edit GPT"
+                    >
+                        <FiEdit size={14} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(agent.id); }}
+                        className="p-1.5 sm:p-2 bg-white/80 dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 rounded-full hover:bg-red-500 hover:text-white dark:hover:bg-red-700/80 transition-colors shadow"
+                        title="Delete GPT"
+                    >
+                        <FiTrash2 size={14} />
+                    </button>
+                </div>
             </div>
 
             <div className="p-3 sm:p-4 flex flex-col flex-grow">
@@ -102,6 +129,69 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     const { isDarkMode, toggleTheme } = useTheme();
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const navigate = useNavigate();
+    // New state for move to folder modal
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [agentToMove, setAgentToMove] = useState(null);
+    const [folders, setFolders] = useState(['Uncategorized']);
+    
+    // Handler for deleting a GPT
+    const handleDeleteGpt = useCallback(async (id) => {
+        if (window.confirm("Are you sure you want to delete this GPT?")) {
+            setLoading(true);
+            try {
+                const response = await axiosInstance.delete(`/api/custom-gpts/${id}`, { withCredentials: true });
+                if (response.data.success) {
+                    toast.success(`GPT deleted successfully.`);
+                    
+                    // Update the state to reflect the deletion
+                    const updatedData = {};
+                    Object.keys(agentsData).forEach(category => {
+                        updatedData[category] = agentsData[category].filter(agent => agent.id !== id);
+                    });
+                    setAgentsData(updatedData);
+                } else {
+                    toast.error(response.data.message || "Failed to delete GPT");
+                }
+            } catch (err) {
+                console.error("Error deleting custom GPT:", err);
+                toast.error(err.response?.data?.message || "Error deleting GPT");
+            } finally {
+                setLoading(false);
+            }
+        }
+    }, [agentsData]);
+    
+    // Handler for editing a GPT
+    const handleEditGpt = useCallback((id) => {
+        navigate(`/admin/edit-gpt/${id}`);
+    }, [navigate]);
+    
+    // Handler for moving a GPT to folder
+    const handleMoveToFolder = useCallback((agent) => {
+        setAgentToMove(agent);
+        setShowMoveModal(true);
+    }, []);
+    
+    // Handler for when a GPT is successfully moved
+    const handleGptMoved = useCallback((movedGpt, newFolderName) => {
+        // Update the folder info in state
+        const updatedData = {};
+        Object.keys(agentsData).forEach(category => {
+            updatedData[category] = agentsData[category].map(agent => 
+                agent.id === movedGpt._id ? { ...agent, folder: newFolderName || null } : agent
+            );
+        });
+        setAgentsData(updatedData);
+        
+        // Add new folder to folders list if it doesn't exist yet
+        if (newFolderName && !folders.includes(newFolderName)) {
+            setFolders(prev => [...prev, newFolderName]);
+        }
+        
+        setShowMoveModal(false);
+        setAgentToMove(null);
+        toast.success(`GPT moved successfully.`);
+    }, [agentsData, folders]);
 
     const applySorting = (data, sortOpt) => {
         if (sortOpt === 'Default') return data;
@@ -128,6 +218,13 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     const sortedGpts = [...response.data.customGpts].sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
                     );
+                    
+                    // Extract folders for the move to folder functionality
+                    const uniqueFolders = [...new Set(sortedGpts
+                        .filter(gpt => gpt.folder)
+                        .map(gpt => gpt.folder))];
+                    setFolders(prev => [...new Set(['Uncategorized', ...uniqueFolders])]);
+                    
                     const categorizedData = {
                         featured: [],
                         productivity: [],
@@ -143,7 +240,8 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         messageCount: gpt.messageCount || 0,
                         modelType: gpt.model,
                         hasWebSearch: gpt.capabilities?.webBrowsing,
-                        createdAt: gpt.createdAt
+                        createdAt: gpt.createdAt,
+                        folder: gpt.folder // Add folder information
                     }));
                     sortedGpts.forEach(gpt => {
                         const text = (gpt.description + ' ' + gpt.name).toLowerCase();
@@ -156,7 +254,8 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             messageCount: gpt.messageCount || 0,
                             modelType: gpt.model,
                             hasWebSearch: gpt.capabilities?.webBrowsing,
-                            createdAt: gpt.createdAt
+                            createdAt: gpt.createdAt,
+                            folder: gpt.folder // Add folder information
                         };
                         if (categorizedData.featured.some(a => a.name === gpt.name)) {
                             return;
@@ -427,11 +526,14 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                             key={agent.id || agent.name}
                                                             agent={agent}
                                                             onClick={() => handleNavigateToChat(agent.id)}
+                                                            onEdit={handleEditGpt}
+                                                            onDelete={handleDeleteGpt}
+                                                            onMoveToFolder={handleMoveToFolder}
                                                         />
                                                     ) : (
                                                         <div 
                                                             key={agent.id || agent.name} 
-                                                            className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer"
+                                                            className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer group"
                                                             onClick={() => handleNavigateToChat(agent.id)}
                                                         >
                                                             <div className="h-14 w-14 bg-gradient-to-br from-gray-100 to-gray-300 dark:from-gray-700 dark:to-gray-900 rounded-md overflow-hidden mr-4 flex-shrink-0">
@@ -464,6 +566,31 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                         </span>
                                                                     )}
                                                                 </div>
+                                                            </div>
+                                                            
+                                                            {/* Add action buttons for list view */}
+                                                            <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleMoveToFolder(agent); }}
+                                                                    className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-green-500 hover:text-white transition-colors"
+                                                                    title="Move to Folder"
+                                                                >
+                                                                    <FiFolderPlus size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleEditGpt(agent.id); }}
+                                                                    className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-blue-500 hover:text-white transition-colors"
+                                                                    title="Edit GPT"
+                                                                >
+                                                                    <FiEdit size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteGpt(agent.id); }}
+                                                                    className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-red-500 hover:text-white transition-colors"
+                                                                    title="Delete GPT"
+                                                                >
+                                                                    <FiTrash2 size={14} />
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     )
@@ -500,11 +627,14 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                     key={agent.id || agent.name}
                                                                     agent={agent}
                                                                     onClick={() => handleNavigateToChat(agent.id)}
+                                                                    onEdit={handleEditGpt}
+                                                                    onDelete={handleDeleteGpt}
+                                                                    onMoveToFolder={handleMoveToFolder}
                                                                 />
                                                             ) : (
                                                                 <div 
                                                                     key={agent.id || agent.name} 
-                                                                    className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer"
+                                                                    className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer group"
                                                                     onClick={() => handleNavigateToChat(agent.id)}
                                                                 >
                                                                     <div className="h-14 w-14 bg-gradient-to-br from-gray-100 to-gray-300 dark:from-gray-700 dark:to-gray-900 rounded-md overflow-hidden mr-4 flex-shrink-0">
@@ -538,6 +668,31 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                             )}
                                                                         </div>
                                                                     </div>
+                                                                    
+                                                                    {/* Action buttons for list view */}
+                                                                    <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleMoveToFolder(agent); }}
+                                                                            className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-green-500 hover:text-white transition-colors"
+                                                                            title="Move to Folder"
+                                                                        >
+                                                                            <FiFolderPlus size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleEditGpt(agent.id); }}
+                                                                            className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-blue-500 hover:text-white transition-colors"
+                                                                            title="Edit GPT"
+                                                                        >
+                                                                            <FiEdit size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteGpt(agent.id); }}
+                                                                            className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-red-500 hover:text-white transition-colors"
+                                                                            title="Delete GPT"
+                                                                        >
+                                                                            <FiTrash2 size={14} />
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             )
                                                         ))}
@@ -564,6 +719,23 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     </div>
                 )}
             </div>
+            
+            {/* Move to Folder Modal */}
+            {showMoveModal && agentToMove && (
+                <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center text-white">Loading...</div>}>
+                    <MoveToFolderModal
+                        isOpen={showMoveModal}
+                        onClose={() => { setShowMoveModal(false); setAgentToMove(null); }}
+                        gpt={{
+                            _id: agentToMove.id,
+                            name: agentToMove.name,
+                            folder: agentToMove.folder
+                        }}
+                        existingFolders={folders.filter(f => f !== 'Uncategorized')}
+                        onSuccess={handleGptMoved}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 };
