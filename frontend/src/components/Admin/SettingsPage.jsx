@@ -192,7 +192,7 @@ const SettingsPage = () => {
                 <input
                     type={showKeys[modelName] ? 'text' : 'password'}
                     name={modelName}
-                    value={apiKeys[modelName]}
+                    value={apiKeys[modelName] || ''}
                     onChange={handleApiKeyChange}
                     className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                     placeholder={placeholder}
@@ -334,7 +334,7 @@ const SettingsPage = () => {
                                 <input
                                     type="password"
                                     name="currentPassword"
-                                    value={passwordData.currentPassword}
+                                    value={passwordData.currentPassword || ''}
                                     onChange={handlePasswordChange}
                                     className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-black dark:text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 placeholder-gray-400 dark:placeholder-gray-500"
                                     placeholder="Current password"
@@ -343,7 +343,7 @@ const SettingsPage = () => {
                                 <input
                                     type="password"
                                     name="newPassword"
-                                    value={passwordData.newPassword}
+                                    value={passwordData.newPassword || ''}
                                     onChange={handlePasswordChange}
                                     className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-black dark:text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 placeholder-gray-400 dark:placeholder-gray-500"
                                     placeholder="New password"
@@ -352,7 +352,7 @@ const SettingsPage = () => {
                                 <input
                                     type="password"
                                     name="confirmPassword"
-                                    value={passwordData.confirmPassword}
+                                    value={passwordData.confirmPassword || ''}
                                     onChange={handlePasswordChange}
                                     className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-black dark:text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 placeholder-gray-400 dark:placeholder-gray-500"
                                     placeholder="Confirm new password"
@@ -395,6 +395,10 @@ const SettingsPage = () => {
                                     {renderApiKeyInput('claude', 'sk-ant-...')}
                                     {renderApiKeyInput('gemini', 'AIza...')}
                                     {renderApiKeyInput('llama', 'meta-llama-...')}
+                                    {renderApiKeyInput(
+                                        "openRouter",
+                                        "Enter your OpenRouter API key"
+                                    )}
                                 </div>
                             )}
 

@@ -14,6 +14,7 @@ import axios from 'axios';
 // Import Markdown components
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { TbRouter } from 'react-icons/tb';
 
 const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL;
 
@@ -53,7 +54,7 @@ When providing code examples:
     const [imagePreview, setImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState(null); // Store the actual file
     const [promptMode, setPromptMode] = useState('edit'); // 'edit' or 'preview'
-    const [selectedModel, setSelectedModel] = useState('gpt-4');
+    const [selectedModel, setSelectedModel] = useState('router-engine');
     const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false); // State for dropdown
     const [knowledgeFiles, setKnowledgeFiles] = useState([]); // State for knowledge files
     const [isMobileView, setIsMobileView] = useState(false);
@@ -135,6 +136,7 @@ When providing code examples:
 
     // Model icons mapping
     const modelIcons = {
+        'router-engine': <TbRouter className="text-yellow-500 mr-2" size={18} />,
         'GPT-4o': <RiOpenaiFill className="text-green-500 mr-2" size={18} />,
         'GPT-4o-mini': <SiOpenai className="text-green-400 mr-2" size={16} />,
         'Gemini-flash-2.5': <SiGooglegemini className="text-blue-400 mr-2" size={16} />,
@@ -690,6 +692,7 @@ When providing code examples:
                                     onChange={(e) => setSelectedModel(e.target.value)}
                                     className="w-full bg-white dark:bg-[#262626] border border-gray-400 dark:border-gray-700 rounded-md pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
                                 >
+                                    <option value="openrouter/auto">Open-Engine  ⭐preferred</option>
                                     <option value="GPT-4o">GPT-4o</option>
                                     <option value="GPT-4o-mini">GPT-4o-mini</option>
                                     <option value="Gemini-flash-2.5">Gemini-flash-2.5</option>

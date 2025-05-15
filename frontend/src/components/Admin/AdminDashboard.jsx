@@ -8,8 +8,7 @@ import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill, RiMoonFill, RiSunFill } from 'react-icons/ri';
-import AgentCard from './AgentCard';
-import CategorySection from './CategorySection';
+import { TbRouter } from 'react-icons/tb';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
 import { toast } from 'react-toastify';
@@ -18,6 +17,7 @@ const defaultAgentImage = '/img.png';
 
 // Model icons mapping
 const modelIcons = {
+    'router-engine': <TbRouter className="text-yellow-500" size={18} />,
     'gpt-4': <RiOpenaiFill className="text-green-500" size={18} />,
     'gpt-3.5': <SiOpenai className="text-green-400" size={16} />,
     'claude': <FaRobot className="text-purple-400" size={16} />,
