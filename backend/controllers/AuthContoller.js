@@ -15,23 +15,77 @@ const ChatHistory = require('../models/ChatHistory');
 const { sendVerificationEmail, sendWelcomeEmail, sendResetPasswordEmail, sendPasswordResetSuccessEmail } = require('../mailtrap/email');
 
 
-const profilePicStorage = multer.diskStorage({
-    destination: './uploads/profilePics',
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, `${req.body.email}-${uniqueSuffix}${path.extname(file.originalname)}`);
-    },
-});
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-secure-encryption-key-exactly-32-b'; // Make this exactly 32 bytes
+const IV_LENGTH = 16; // For AES, this is always 16 bytes
+
+// Function to encrypt API keys
+function encrypt(text) {
+    try {
+        // Ensure key is exactly 32 bytes
+        let key = Buffer.from(ENCRYPTION_KEY);
+        if (key.length !== 32) {
+            const newKey = Buffer.alloc(32);
+            key.copy(newKey, 0, 0, Math.min(key.length, 32));
+            key = newKey;
+        }
+        
+        const iv = crypto.randomBytes(IV_LENGTH);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        let encrypted = cipher.update(text);
+        encrypted = Buffer.concat([encrypted, cipher.final()]);
+        return iv.toString('hex') + ':' + encrypted.toString('hex');
+    } catch (err) {
+        console.error("Encryption error:", err);
+        throw err;
+    }
+}
+
+// Function to decrypt API keys
+function decrypt(text) {
+    try {
+        // Check if the text is in the correct format
+        if (!text || !text.includes(':')) {
+            return '';
+        }
+
+        let key = Buffer.from(ENCRYPTION_KEY);
+        if (key.length !== 32) {
+            const newKey = Buffer.alloc(32);
+            key.copy(newKey, 0, 0, Math.min(key.length, 32));
+            key = newKey;
+        }
+        
+        const textParts = text.split(':');
+        const iv = Buffer.from(textParts.shift(), 'hex');
+        const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+        
+        // Ensure IV is correct length
+        if (iv.length !== IV_LENGTH) {
+            return '';
+        }
+
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return decrypted.toString();
+    } catch (err) {
+        console.error("Decryption error:", err);
+        return '';
+    }
+}
+
+// --- Multer setup for profile picture ---
+const profilePicStorage = multer.memoryStorage();
 const profilePicUpload = multer({
     storage: profilePicStorage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for profile pics
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
             cb(new Error('Not an image! Please upload an image file.'), false);
         }
-    },
+    }
 }).single('profileImage');
 
 const Signup = async (req, res) => {
