@@ -34,9 +34,10 @@ const AgentCard = ({ agentId, agentImage, agentName, status, userCount, messageC
             <div className="p-4">
                 <h3 className="font-medium text-base mb-1 truncate">{agentName}</h3>
                 <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    {modelIcons[modelType] && (
-                        <span>{modelIcons[modelType]}</span>
+                    {modelIcons[modelType === 'openrouter/auto' ? 'router-engine' : modelType] && (
+                        <span>{modelIcons[modelType === 'openrouter/auto' ? 'router-engine' : modelType]}</span>
                     )}
+                    <span className="ml-1">{modelType === 'openrouter/auto' ? 'router-engine' : modelType}</span>
                 </div>
                 
                 {hasWebSearch && (
@@ -45,17 +46,6 @@ const AgentCard = ({ agentId, agentImage, agentName, status, userCount, messageC
                         <span>Web search</span>
                     </div>
                 )}
-                
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-1">
-                        <FiUsers className="text-gray-500" />
-                        <span>{userCount || 0} users</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <FiMessageSquare className="text-gray-500" />
-                        <span>{messageCount || 0} msgs</span>
-                    </div>
-                </div>
             </div>
         </div>
     );

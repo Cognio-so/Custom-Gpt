@@ -396,8 +396,8 @@ const SettingsPage = () => {
                                     {renderApiKeyInput('gemini', 'AIza...')}
                                     {renderApiKeyInput('llama', 'meta-llama-...')}
                                     {renderApiKeyInput(
-                                        "openRouter",
-                                        "Enter your OpenRouter API key"
+                                        "router-engine",
+                                        "Enter your  API key"
                                     )}
                                 </div>
                             )}

@@ -17,6 +17,7 @@ import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
+import { RiSunFill, RiMoonFill } from 'react-icons/ri';
 
 const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
@@ -96,12 +97,17 @@ const modelIcons = {
     'llama': <BiLogoMeta className="text-blue-500" size={18} />
 };
 
+const getDisplayModelName = (modelType) => {
+    if (modelType === 'openrouter/auto') return 'router-engine';
+    return modelType;
+};
+
 const AdminChat = () => {
     const { gptId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const { user, loading: authLoading } = useAuth();
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [userData, setUserData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -777,54 +783,65 @@ const AdminChat = () => {
                                 <span className="mr-1">New Chat</span>
                                 {gptData.model && (
                                     <div className="flex items-center ml-2 text-xs md:text-sm px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                                        {modelIcons[gptData.model] || null}
-                                        <span>{gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model}</span>
+                                        {modelIcons[gptData.model === 'openrouter/auto' ? 'router-engine' : gptData.model] || null}
+                                        <span>{gptData.model === 'openrouter/auto' ? 'router-engine' : (gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
-
                     </div>
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={toggleProfile}
-                            className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-300 dark:border-white/20 hover:border-blue-500 dark:hover:border-white/40 transition-colors"
+                            onClick={toggleTheme}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
-                            {(userData || mockUser)?.profilePic ? (
-                                <img
-                                    src={(userData || mockUser).profilePic}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                                    <IoPersonCircleOutline size={24} className="text-gray-500 dark:text-white" />
+                            {isDarkMode ? 
+                                <RiSunFill size={20} className="text-yellow-400" /> : 
+                                <RiMoonFill size={20} className="text-gray-700" />
+                            }
+                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={toggleProfile}
+                                className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-300 dark:border-white/20 hover:border-blue-500 dark:hover:border-white/40 transition-colors"
+                            >
+                                {(userData || mockUser)?.profilePic ? (
+                                    <img
+                                        src={(userData || mockUser).profilePic}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                        <IoPersonCircleOutline size={24} className="text-gray-500 dark:text-white" />
+                                    </div>
+                                )}
+                            </button>
+
+                            {isProfileOpen && (
+                                <div className="absolute top-12 right-0 w-64 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-lg border border-gray-200 dark:border-white/10 overflow-hidden z-30">
+                                    <div className="p-4 border-b border-gray-200 dark:border-white/10">
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                            {userData?.name || mockUser.name}
+                                        </p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                            {userData?.email || mockUser.email}
+                                        </p>
+                                    </div>
+                                    <div className="py-1">
+                                        <button className="w-full px-4 py-2.5 text-left flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300">
+                                            <IoPersonOutline size={18} />
+                                            <span>Profile</span>
+                                        </button>
+                                        <button className="w-full px-4 py-2.5 text-left flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300" onClick={() => navigate('/admin/settings')}>
+                                            <IoSettingsOutline size={18} />
+                                            <span>Settings</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
-                        </button>
-
-                        {isProfileOpen && (
-                            <div className="absolute top-12 right-0 w-64 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-lg border border-gray-200 dark:border-white/10 overflow-hidden z-30">
-                                <div className="p-4 border-b border-gray-200 dark:border-white/10">
-                                    <p className="font-medium text-gray-900 dark:text-white">
-                                        {userData?.name || mockUser.name}
-                                    </p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                        {userData?.email || mockUser.email}
-                                    </p>
-                                </div>
-                                <div className="py-1">
-                                    <button className="w-full px-4 py-2.5 text-left flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300">
-                                        <IoPersonOutline size={18} />
-                                        <span>Profile</span>
-                                    </button>
-                                    <button className="w-full px-4 py-2.5 text-left flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300" onClick={() => navigate('/admin/settings')}>
-                                        <IoSettingsOutline size={18} />
-                                        <span>Settings</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 

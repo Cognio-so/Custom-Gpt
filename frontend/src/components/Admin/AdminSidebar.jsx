@@ -97,7 +97,16 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
             >
                 <div>
                     <div className={`px-4 py-6 mb-4 flex ${isCollapsed ? 'justify-center' : 'justify-between'} items-center`}>
-                        {!isCollapsed && <h1 className="text-xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>}
+                        {!isCollapsed && <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                            <div className="flex items-center">
+                                <img
+                                    src="/EMSA logo.png"
+                                    alt="EMSA"
+                                    className="h-10 w-10 mr-3"
+                                />
+                                <span className="text-xl font-bold text-gray-900 dark:text-white">EMSA</span>
+                            </div>
+                        </h1>}
                         <button
                             onClick={toggleSidebar}
                             className="rounded-full p-1.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-white/20 transition-colors hidden md:flex items-center justify-center"
@@ -112,8 +121,8 @@ const AdminSidebar = ({ activePage = 'dashboard', onNavigate }) => {
                                 key={item.id}
                                 onClick={() => handleNavigation(item.id)}
                                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 rounded-lg text-left transition-colors ${activePage === item.id || (activePage === 'collections' && (item.id === 'create-gpt' || item.id.startsWith('edit-gpt')))
-                                        ? 'bg-white dark:bg-white/10 text-black dark:text-white'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-black hover:text-gray-900 dark:hover:text-white'
+                                    ? 'bg-white dark:bg-white/10 text-black dark:text-white'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-black hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 title={isCollapsed ? item.label : ''}
                             >

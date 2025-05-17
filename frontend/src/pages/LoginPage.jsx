@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { FcGoogle } from 'react-icons/fc';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,39 +8,54 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const { login, loading, error, setError, googleAuthInitiate } = useAuth();
   const [searchParams] = useSearchParams();
+  const [successMessage, setSuccessMessage] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     setError(null);
+
+    // Handle URL parameters
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setError(`Login failed: ${errorParam.replace(/_/g, ' ')}`);
     }
+
     const signupParam = searchParams.get('signup');
     if (signupParam === 'success') {
+      setSuccessMessage('Registration successful! Please check your email to verify your account.');
     }
-  }, [setError, searchParams]);
+
+    // Handle state from react-router
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+    }
+  }, [setError, searchParams, location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSuccessMessage(null);
     await login(email, password);
   };
 
   return (
     <div className="flex h-screen w-full bg-white">
       {/* Left side - Image and Text */}
-      <div className="hidden lg:flex lg:w-1/2 bg-black items-center justify-center relative">
-        <div className="absolute inset-0 bg-black opacity-80"></div>
-        <div className="relative z-10 text-white px-12 max-w-lg">
-          <h1 className="text-4xl font-bold mb-6">AI-Powered Experience</h1>
-          <p className="text-lg opacity-90 mb-8">
-            Access your intelligent assistant and unlock the power of advanced AI.
-            Let our cutting-edge algorithms transform your workflow and elevate your
-            productivity to unprecedented levels.
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-[#02091A] to-[#031555] flex-col items-center relative overflow-hidden py-12">
+        {/* Center Text Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center flex-grow px-12 text-center">
+          <h1 className="text-5xl font-bold mb-8 text-white">Decision Intelligence Starts Here</h1>
+          <p className="text-xl font-medium mb-6 text-white">Welcome to MyGpt-Intelligent AI Dashboards</p>
+          <p className="text-lg opacity-90 mb-6 text-[#A1B0C5]">
+            Access MyGpt-Intelligent AI Dashboards designed to analyse data, generate insights, and support your operational decisions in real time.
           </p>
-          <div className="flex items-center space-x-3">
-            <p className="text-sm uppercase font-bold">Intelligent Solutions</p>
-          </div>
+          <p className="text-lg italic mb-8 text-[#FBFCFD]">
+            From complexity to clarity—in just a few clicks.
+          </p>
+          <div className="h-1 w-32 bg-[#055FF7] mt-4"></div>
         </div>
+
+        {/* Background gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#031555] to-[#083EA9] opacity-20"></div>
       </div>
 
       {/* Right side - Login Form */}
@@ -54,6 +69,12 @@ const LoginPage = () => {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
               {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4" role="alert">
+              {successMessage}
             </div>
           )}
 
@@ -78,9 +99,9 @@ const LoginPage = () => {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <a href="#" className="text-sm text-gray-600 hover:text-black">
+                <Link to="/forgot-password" className="text-sm text-gray-600 hover:text-black">
                   Forgot password?
-                </a>
+                </Link>
               </div>
               <input
                 id="password"

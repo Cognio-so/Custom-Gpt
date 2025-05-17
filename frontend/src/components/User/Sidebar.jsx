@@ -103,8 +103,8 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
         <button
           onClick={toggleMobileMenu}
           className={`rounded-full p-2 shadow-lg transition-colors ${isDarkMode
-              ? 'bg-gray-800 text-white hover:bg-gray-700'
-              : 'bg-white text-gray-700 hover:bg-gray-100'
+            ? 'bg-gray-800 text-white hover:bg-gray-700'
+            : 'bg-white text-gray-700 hover:bg-gray-100'
             }`}
         >
           <IoMenuOutline size={24} />
@@ -131,12 +131,21 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
         <div>
           {/* Logo and Toggle Button */}
           <div className={`px-4 py-6 mb-4 flex ${isCollapsed ? 'justify-center' : 'justify-between'} items-center`}>
-            {!isCollapsed && <h1 className="text-xl font-bold">AI Agent</h1>}
+            {!isCollapsed && <h1 className="text-xl font-bold">
+              <div className="flex items-center">
+                <img
+                  src="/EMSA logo.png"
+                  alt="EMSA"
+                  className="h-10 w-10 mr-3"
+                />
+                <span className="text-xl font-bold text-gray-900 dark:text-white">EMSA</span>
+              </div>
+            </h1>}
             <button
               onClick={toggleSidebar}
               className={`rounded-full p-1.5 transition-colors hidden md:flex items-center justify-center ${isDarkMode
-                  ? 'bg-white/10 hover:bg-white/20 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
+                ? 'bg-white/10 hover:bg-white/20 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
                 }`}
             >
               {isCollapsed ? <IoChevronForwardOutline size={16} /> : <IoChevronBackOutline size={16} />}
@@ -150,10 +159,10 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
                 key={item.id}
                 onClick={() => handleNavigation(item.id)}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} px-4 py-3 rounded-lg text-left transition-colors ${activeItem === item.id
-                    ? (isDarkMode ? 'bg-white/10 text-white' : 'bg-blue-100 text-blue-700 font-medium')
-                    : (isDarkMode
-                      ? 'text-gray-400 hover:bg-white/5 hover:text-white'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')
+                  ? (isDarkMode ? 'bg-white/10 text-white' : 'bg-blue-100 text-blue-700 font-medium')
+                  : (isDarkMode
+                    ? 'text-gray-400 hover:bg-white/5 hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')
                   }`}
                 title={isCollapsed ? item.label : ''}
               >
@@ -173,8 +182,8 @@ const Sidebar = ({ activePage = 'dashboard', onNavigate }) => {
           <button
             onClick={handleLogout}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full px-4 py-3 rounded-lg text-left transition-colors ${isDarkMode
-                ? 'text-gray-400 hover:bg-white/5 hover:text-white'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              ? 'text-gray-400 hover:bg-white/5 hover:text-white'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
             title={isCollapsed ? 'Logout' : ''}
           >

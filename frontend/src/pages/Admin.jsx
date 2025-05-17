@@ -10,9 +10,6 @@ import HistoryPage from '../components/Admin/HistoryPage';
 import UserHistoryPage from '../components/Admin/UserHistoryPage';
 import AdminChat from '../components/Admin/AdminChat';
 
-// Placeholder components for other sections
-const CollectionsComponent = () => <div className="flex-1 p-6"><h1 className="text-2xl font-bold">Collections Page</h1></div>;
-const HistoryComponent = () => <div className="flex-1 p-6"><h1 className="text-2xl font-bold">History Page</h1></div>;
 
 const AdminLayout = () => {
     const location = useLocation();

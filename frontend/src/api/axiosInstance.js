@@ -30,6 +30,11 @@ const removeAccessToken = () => {
     sessionStorage.removeItem('token');
     // Also remove from default headers
     delete axiosInstance.defaults.headers.common['Authorization'];
+    // Reset the axios instance to its initial state
+    axiosInstance.interceptors.request.handlers = [];
+    axiosInstance.interceptors.response.handlers = [];
+    // Re-add the initial interceptors
+    setupAxiosInterceptors(); // You'll need to extract your interceptor setup into this function
 };
 
 // Track if we're currently refreshing the token
@@ -49,90 +54,91 @@ const processQueue = (error, token = null) => {
     failedQueue = [];
 };
 
-// Add request interceptor to attach token to every request
-axiosInstance.interceptors.request.use(
-    (config) => {
-        // Ensure withCredentials is set for all requests
-        config.withCredentials = true;
-        
-        // Get the token from localStorage
-        const token = getAccessToken();
-        if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
-// Add response interceptor to handle auth errors
-axiosInstance.interceptors.response.use(
-    (response) => {
-        return response;
-    },
-    async (error) => {
-        const originalRequest = error.config;
-        
-        // Don't retry if we already tried or it's a refresh token request
-        if (error.response?.status === 401 && !originalRequest._retry &&
-            !originalRequest.url.includes('/api/auth/refresh')) {
-            
-            if (isRefreshing) {
-                // If refresh is in progress, queue this request
-                return new Promise((resolve, reject) => {
-                    failedQueue.push({ resolve, reject });
-                }).then(token => {
-                    originalRequest.headers['Authorization'] = `Bearer ${token}`;
-                    return axios(originalRequest);
-                }).catch(err => {
-                    return Promise.reject(err);
-                });
+// Extract interceptor setup into a function that can be called again
+const setupAxiosInterceptors = () => {
+    axiosInstance.interceptors.request.use(
+        (config) => {
+            config.withCredentials = true;
+            const token = getAccessToken();
+            if (token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
             }
+            return config;
+        },
+        (error) => {
+            return Promise.reject(error);
+        }
+    );
+
+    axiosInstance.interceptors.response.use(
+        (response) => {
+            return response;
+        },
+        async (error) => {
+            const originalRequest = error.config;
             
-            originalRequest._retry = true;
-            isRefreshing = true;
-            
-            try {
-                // Use the correct refresh endpoint from AuthContext
-                const response = await axios.post(`${baseURL}/api/auth/refresh`, {}, 
-                    { withCredentials: true });
+            // Don't retry if we already tried or it's a refresh token request
+            if (error.response?.status === 401 && !originalRequest._retry &&
+                !originalRequest.url.includes('/api/auth/refresh')) {
                 
-                if (response.data && response.data.accessToken) {
-                    const newToken = response.data.accessToken;
-                    setAccessToken(newToken);
+                if (isRefreshing) {
+                    // If refresh is in progress, queue this request
+                    return new Promise((resolve, reject) => {
+                        failedQueue.push({ resolve, reject });
+                    }).then(token => {
+                        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                        return axios(originalRequest);
+                    }).catch(err => {
+                        return Promise.reject(err);
+                    });
+                }
+                
+                originalRequest._retry = true;
+                isRefreshing = true;
+                
+                try {
+                    // Use the correct refresh endpoint from AuthContext
+                    const response = await axios.post(`${baseURL}/api/auth/refresh`, {}, 
+                        { withCredentials: true });
                     
-                    // Process any queued requests with the new token
-                    processQueue(null, newToken);
-                    
-                    // Update the current request and retry
-                    originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-                    return axios(originalRequest);
-                } else {
-                    // Handle cases where refresh might succeed but not return a token
-                    const refreshError = new Error('Failed to refresh token: No new token received');
+                    if (response.data && response.data.accessToken) {
+                        const newToken = response.data.accessToken;
+                        setAccessToken(newToken);
+                        
+                        // Process any queued requests with the new token
+                        processQueue(null, newToken);
+                        
+                        // Update the current request and retry
+                        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+                        return axios(originalRequest);
+                    } else {
+                        // Handle cases where refresh might succeed but not return a token
+                        const refreshError = new Error('Failed to refresh token: No new token received');
+                        processQueue(refreshError);
+                        removeAccessToken();
+                        // Don't redirect here - let the auth context handle that
+                        return Promise.reject(refreshError); // Reject with specific error
+                    }
+                } catch (refreshError) {
+                    // Log the actual refresh error for better debugging
+                    console.error("Token refresh failed:", refreshError.response?.data || refreshError.message);
                     processQueue(refreshError);
                     removeAccessToken();
                     // Don't redirect here - let the auth context handle that
-                    return Promise.reject(refreshError); // Reject with specific error
+                    return Promise.reject(refreshError);
+                } finally {
+                    isRefreshing = false;
                 }
-            } catch (refreshError) {
-                // Log the actual refresh error for better debugging
-                console.error("Token refresh failed:", refreshError.response?.data || refreshError.message);
-                processQueue(refreshError);
-                removeAccessToken();
-                // Don't redirect here - let the auth context handle that
-                return Promise.reject(refreshError);
-            } finally {
-                isRefreshing = false;
             }
+            
+            // For non-401 errors or retried requests, just reject
+            return Promise.reject(error);
         }
-        
-        // For non-401 errors or retried requests, just reject
-        return Promise.reject(error);
-    }
-);
+    );
+};
+
+// Call it initially
+setupAxiosInterceptors();
 
 // Export all the necessary functions
 export { 

@@ -13,7 +13,9 @@ import {
     FiTrash2,
     FiChevronRight,
     FiChevronDown,
-    FiCheck
+    FiCheck,
+    FiSun,
+    FiMoon
 } from 'react-icons/fi';
 import AssignGptsModal from './AssignGptsModal';
 import TeamMemberDetailsModal from './TeamMemberDetailsModal';
@@ -101,7 +103,7 @@ const TeamManagement = () => {
     const [refreshInterval, setRefreshInterval] = useState(null);
     const [showEditPermissionsModal, setShowEditPermissionsModal] = useState(false);
     const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState(null);
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const { user } = useAuth();
     const actionsMenuRef = useRef(null);
     const departmentFilterRef = useRef(null);
@@ -478,9 +480,23 @@ const TeamManagement = () => {
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-black text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             <style>{scrollbarHideStyles}</style>
-            <div className="mb-6 flex-shrink-0">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1 text-center sm:text-left">Team Management</h1>
-                <p className="text-gray-600 dark:text-gray-400 text-center sm:text-left">Manage your team members, permissions, and GPT assignments.</p>
+            <div className="mb-6 flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-center sm:text-left">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Team Management</h1>
+                    <p className="text-gray-600 dark:text-gray-400">Manage your team members, permissions, and GPT assignments.</p>
+                </div>
+                <button
+                    onClick={toggleTheme}
+                    className={`p-2 rounded-full transition-colors self-center sm:self-auto mt-3 sm:mt-0 ${
+                        isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                </button>
             </div>
 
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0">

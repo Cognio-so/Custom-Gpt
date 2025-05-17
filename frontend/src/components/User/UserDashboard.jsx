@@ -61,9 +61,8 @@ const GptCard = memo(({ gpt, formatDate, onChatClick, onToggleFavorite, onMoveTo
         <div className="p-3 sm:p-4 flex-grow flex flex-col">
             <div className="flex items-start justify-between mb-1.5 sm:mb-2">
                 <h3 className={`font-semibold text-base sm:text-lg line-clamp-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{gpt.name}</h3>
-                <div className={`flex items-center flex-shrink-0 gap-1 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'
-                    }`}>
-                    <span>{gpt.model || 'N/A'}</span>
+                <div className={`flex items-center flex-shrink-0 gap-1 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'}`}>
+                    <span>{gpt.model === 'openrouter/auto' ? 'router-engine' : gpt.model || 'N/A'}</span>
                 </div>
             </div>
 

@@ -1,13 +1,32 @@
 const express = require('express');
 const router = express.Router();
-const { Signup, Login, Logout, googleAuth, googleAuthCallback, refreshTokenController, getCurrentUser, getAllUsers, removeTeamMember, getUsersWithGptCounts, getUserGptCount, updateUserProfile, updateUserProfilePicture, changePassword, updatePassword, getApiKeys, saveApiKeys, updateUserPermissions } = require('../controllers/AuthContoller');
+const { Signup,
+  Login,
+  Logout,
+  googleAuth,
+  googleAuthCallback,
+  refreshTokenController,
+  getCurrentUser,
+  getAllUsers,
+  removeTeamMember,
+  getUsersWithGptCounts,
+  getUserGptCount,
+  updateUserProfile,
+  updateUserProfilePicture,
+  changePassword,
+  updatePassword,
+  getApiKeys,
+  saveApiKeys, updateUserPermissions, verifyEmail, forgetPassword, resetpassword } = require('../controllers/AuthContoller');
 const passport = require('passport');
-const { protectRoute } = require('../middleware/authMiddleware'); // Imports protectRoute
-const multer = require('multer'); // Import multer
+const { protectRoute } = require('../middleware/authMiddleware'); 
+const multer = require('multer'); 
 
 router.post('/signup', Signup);
 router.post('/login', Login);
 router.post('/logout', Logout);
+router.post('/verify-email', verifyEmail);
+router.post('/forget-password', forgetPassword);
+router.post('/reset-password/:token', resetpassword);
 router.post('/refresh', refreshTokenController);
 router.get('/me', protectRoute, getCurrentUser);
 

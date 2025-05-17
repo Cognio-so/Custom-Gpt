@@ -29,6 +29,8 @@ const sendEmail = async (options) => {
     console.error('Error sending email:', error);
     throw error;
   }
+
+  
 };
 
 module.exports = { sendEmail }; 

@@ -17,6 +17,7 @@ import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
+import { RiMoonFill, RiSunFill } from 'react-icons/ri';
 
 const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
@@ -26,6 +27,11 @@ const modelIcons = {
     'claude': <FaRobot className="text-purple-400" size={16} />,
     'gemini': <SiGooglegemini className="text-blue-400" size={16} />,
     'llama': <BiLogoMeta className="text-blue-500" size={18} />
+};
+
+const getDisplayModelName = (modelType) => {
+    if (modelType === 'openrouter/auto') return 'router-engine';
+    return modelType;
 };
 
 const MarkdownStyles = () => (
@@ -200,7 +206,7 @@ const UserChat = () => {
     const queryParams = new URLSearchParams(location.search);
     const gptId = queryParams.get('gptId');
     const { user, loading: authLoading } = useAuth();
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState({
@@ -816,8 +822,7 @@ const UserChat = () => {
                         {gptId && (
                             <button
                                 onClick={handleGoBack}
-                                className={`p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-                                    }`}
+                                className={`p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
                                 aria-label="Go back"
                             >
                                 <IoArrowBack size={20} />
@@ -827,8 +832,7 @@ const UserChat = () => {
                         {/* New Chat Button */}
                         <button
                             onClick={handleNewChat}
-                            className={`p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-                                }`}
+                            className={`p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
                             aria-label="New Chat"
                         >
                             <IoAddCircleOutline size={24} />
@@ -840,61 +844,72 @@ const UserChat = () => {
                                 <span className="mr-1">New Chat</span>
                                 {gptData.model && (
                                     <div className={`flex items-center ml-2 text-xs md:text-sm px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                                        {modelIcons[gptData.model] || null}
-                                        <span>{gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model}</span>
+                                        {modelIcons[gptData.model === 'openrouter/auto' ? 'router-engine' : gptData.model] || null}
+                                        <span>{gptData.model === 'openrouter/auto' ? 'router-engine' : (gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={toggleProfile}
-                            className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-colors ${isDarkMode ? 'border-white/20 hover:border-white/40' : 'border-gray-300 hover:border-gray-500'
-                                }`}
+                            onClick={toggleTheme}
+                            className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
+                            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
-                            {(userData || mockUser)?.profilePic ? (
-                                <img
-                                    src={(userData || mockUser).profilePic}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className={`w-full h-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
-                                    <IoPersonCircleOutline size={24} className={isDarkMode ? 'text-white' : 'text-gray-600'} />
+                            {isDarkMode ? 
+                                <RiSunFill size={20} className="text-yellow-400" /> : 
+                                <RiMoonFill size={20} className="text-gray-700" />
+                            }
+                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={toggleProfile}
+                                className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-colors ${isDarkMode ? 'border-white/20 hover:border-white/40' : 'border-gray-300 hover:border-gray-500'}`}
+                            >
+                                {(userData || mockUser)?.profilePic ? (
+                                    <img
+                                        src={(userData || mockUser).profilePic}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className={`w-full h-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
+                                        <IoPersonCircleOutline size={24} className={isDarkMode ? 'text-white' : 'text-gray-600'} />
+                                    </div>
+                                )}
+                            </button>
+
+                            {isProfileOpen && (
+                                <div className={`absolute top-12 right-0 w-64 rounded-xl shadow-lg border overflow-hidden z-30 ${isDarkMode ? 'bg-[#1e1e1e] border-white/10' : 'bg-white border-gray-200'
+                                    }`}>
+                                    <div className={`p-4 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                            {userData?.name || mockUser.name}
+                                        </p>
+                                        <p className={`text-sm truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            {userData?.email || mockUser.email}
+                                        </p>
+                                    </div>
+                                    <div className="py-1">
+                                        <button className={`w-full px-4 py-2.5 text-left flex items-center space-x-3 transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-white/5' : 'text-gray-700 hover:bg-gray-100'
+                                            }`}>
+                                            <IoPersonOutline size={18} />
+                                            <span>Profile</span>
+                                        </button>
+                                        <button
+                                            onClick={goToSettings}
+                                            className={`w-full px-4 py-2.5 text-left flex items-center space-x-3 transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-white/5' : 'text-gray-700 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            <IoSettingsOutline size={18} />
+                                            <span>Settings</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
-                        </button>
-
-                        {isProfileOpen && (
-                            <div className={`absolute top-12 right-0 w-64 rounded-xl shadow-lg border overflow-hidden z-30 ${isDarkMode ? 'bg-[#1e1e1e] border-white/10' : 'bg-white border-gray-200'
-                                }`}>
-                                <div className={`p-4 border-b ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
-                                    <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        {userData?.name || mockUser.name}
-                                    </p>
-                                    <p className={`text-sm truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                        {userData?.email || mockUser.email}
-                                    </p>
-                                </div>
-                                <div className="py-1">
-                                    <button className={`w-full px-4 py-2.5 text-left flex items-center space-x-3 transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-white/5' : 'text-gray-700 hover:bg-gray-100'
-                                        }`}>
-                                        <IoPersonOutline size={18} />
-                                        <span>Profile</span>
-                                    </button>
-                                    <button
-                                        onClick={goToSettings}
-                                        className={`w-full px-4 py-2.5 text-left flex items-center space-x-3 transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-white/5' : 'text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        <IoSettingsOutline size={18} />
-                                        <span>Settings</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 

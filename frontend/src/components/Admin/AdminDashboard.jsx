@@ -25,12 +25,18 @@ const modelIcons = {
     'llama': <BiLogoMeta className="text-blue-500" size={18} />
 };
 
+// Add this function after the modelIcons declaration (around line 25)
+const getDisplayModelName = (modelType) => {
+    if (modelType === 'openrouter/auto') return 'router-engine';
+    return modelType;
+};
+
 // Enhanced Agent Card component
 const EnhancedAgentCard = ({ agent, onClick, onEdit, onDelete, onMoveToFolder }) => {
     const { isDarkMode } = useTheme();
-    
+
     return (
-        <div 
+        <div
             className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 transition-all shadow-md hover:shadow-lg flex flex-col cursor-pointer group"
             onClick={onClick}
         >
@@ -51,7 +57,7 @@ const EnhancedAgentCard = ({ agent, onClick, onEdit, onDelete, onMoveToFolder })
                         <span className={`text-3xl sm:text-4xl ${isDarkMode ? 'text-white/30' : 'text-gray-500/40'}`}>{agent.name.charAt(0)}</span>
                     </div>
                 )}
-                
+
                 {/* Action Buttons - Added for edit, delete and move to folder */}
                 <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <button
@@ -82,28 +88,19 @@ const EnhancedAgentCard = ({ agent, onClick, onEdit, onDelete, onMoveToFolder })
                 <div className="flex items-start justify-between mb-1.5 sm:mb-2">
                     <h3 className="font-semibold text-base sm:text-lg line-clamp-1 text-gray-900 dark:text-white">{agent.name}</h3>
                     <div className="flex items-center flex-shrink-0 gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs text-gray-600 dark:text-gray-300">
-                        {React.cloneElement(modelIcons[agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
-                        <span className="hidden sm:inline">{agent.modelType}</span>
+                        {React.cloneElement(modelIcons[agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
+                        <span className="hidden sm:inline">{agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType}</span>
                     </div>
                 </div>
-                
+
                 {agent.hasWebSearch && (
                     <div className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 mb-1">
                         <FiGlobe size={12} />
                         <span>Web search</span>
                     </div>
                 )}
-                
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center gap-1">
-                        <FiUsers size={12} />
-                        <span>{agent.userCount || 0} users</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <FiMessageSquare size={12} />
-                        <span>{agent.messageCount || 0} msgs</span>
-                    </div>
-                </div>
+
+
             </div>
         </div>
     );
@@ -133,7 +130,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
     const [showMoveModal, setShowMoveModal] = useState(false);
     const [agentToMove, setAgentToMove] = useState(null);
     const [folders, setFolders] = useState(['Uncategorized']);
-    
+
     // Handler for deleting a GPT
     const handleDeleteGpt = useCallback(async (id) => {
         if (window.confirm("Are you sure you want to delete this GPT?")) {
@@ -142,7 +139,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                 const response = await axiosInstance.delete(`/api/custom-gpts/${id}`, { withCredentials: true });
                 if (response.data.success) {
                     toast.success(`GPT deleted successfully.`);
-                    
+
                     // Update the state to reflect the deletion
                     const updatedData = {};
                     Object.keys(agentsData).forEach(category => {
@@ -160,34 +157,34 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
             }
         }
     }, [agentsData]);
-    
+
     // Handler for editing a GPT
     const handleEditGpt = useCallback((id) => {
         navigate(`/admin/edit-gpt/${id}`);
     }, [navigate]);
-    
+
     // Handler for moving a GPT to folder
     const handleMoveToFolder = useCallback((agent) => {
         setAgentToMove(agent);
         setShowMoveModal(true);
     }, []);
-    
+
     // Handler for when a GPT is successfully moved
     const handleGptMoved = useCallback((movedGpt, newFolderName) => {
         // Update the folder info in state
         const updatedData = {};
         Object.keys(agentsData).forEach(category => {
-            updatedData[category] = agentsData[category].map(agent => 
+            updatedData[category] = agentsData[category].map(agent =>
                 agent.id === movedGpt._id ? { ...agent, folder: newFolderName || null } : agent
             );
         });
         setAgentsData(updatedData);
-        
+
         // Add new folder to folders list if it doesn't exist yet
         if (newFolderName && !folders.includes(newFolderName)) {
             setFolders(prev => [...prev, newFolderName]);
         }
-        
+
         setShowMoveModal(false);
         setAgentToMove(null);
         toast.success(`GPT moved successfully.`);
@@ -218,13 +215,13 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     const sortedGpts = [...response.data.customGpts].sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
                     );
-                    
+
                     // Extract folders for the move to folder functionality
                     const uniqueFolders = [...new Set(sortedGpts
                         .filter(gpt => gpt.folder)
                         .map(gpt => gpt.folder))];
                     setFolders(prev => [...new Set(['Uncategorized', ...uniqueFolders])]);
-                    
+
                     const categorizedData = {
                         featured: [],
                         productivity: [],
@@ -236,8 +233,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                         image: gpt.imageUrl || defaultAgentImage,
                         name: gpt.name,
                         status: gpt.status || 'unknown',
-                        userCount: gpt.userCount || 0,
-                        messageCount: gpt.messageCount || 0,
                         modelType: gpt.model,
                         hasWebSearch: gpt.capabilities?.webBrowsing,
                         createdAt: gpt.createdAt,
@@ -250,8 +245,6 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                             image: gpt.imageUrl || defaultAgentImage,
                             name: gpt.name,
                             status: gpt.status || 'unknown',
-                            userCount: gpt.userCount || 0,
-                            messageCount: gpt.messageCount || 0,
                             modelType: gpt.model,
                             hasWebSearch: gpt.capabilities?.webBrowsing,
                             createdAt: gpt.createdAt,
@@ -381,14 +374,14 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                 <div className="flex items-center">
                                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
                                     <div className="flex items-center ml-4 gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => setViewMode('grid')}
                                             className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                             title="Grid View"
                                         >
                                             <FiGrid className="text-gray-700 dark:text-gray-300" />
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => setViewMode('list')}
                                             className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                             title="List View"
@@ -460,13 +453,13 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                     </button>
                                 </div>
                                 <div className="flex justify-center mt-3 gap-2">
-                                    <button 
+                                    <button
                                         onClick={() => setViewMode('grid')}
                                         className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                     >
                                         <FiGrid className="text-gray-700 dark:text-gray-300" />
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => setViewMode('list')}
                                         className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                     >
@@ -515,14 +508,14 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                     )}
                                                 </div>
                                             </div>
-                                            
-                                            <div className={viewMode === 'grid' ? 
-                                                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : 
+
+                                            <div className={viewMode === 'grid' ?
+                                                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" :
                                                 "space-y-3"
                                             }>
                                                 {filteredAgentsData.featured.map((agent) => (
                                                     viewMode === 'grid' ? (
-                                                        <EnhancedAgentCard 
+                                                        <EnhancedAgentCard
                                                             key={agent.id || agent.name}
                                                             agent={agent}
                                                             onClick={() => handleNavigateToChat(agent.id)}
@@ -531,8 +524,8 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                             onMoveToFolder={handleMoveToFolder}
                                                         />
                                                     ) : (
-                                                        <div 
-                                                            key={agent.id || agent.name} 
+                                                        <div
+                                                            key={agent.id || agent.name}
                                                             className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer group"
                                                             onClick={() => handleNavigateToChat(agent.id)}
                                                         >
@@ -549,25 +542,13 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                 <div className="flex items-center justify-between">
                                                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{agent.name}</h3>
                                                                     <div className="flex items-center ml-2 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] text-gray-600 dark:text-gray-300">
-                                                                        {React.cloneElement(modelIcons[agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
-                                                                        <span className="ml-1">{agent.modelType}</span>
+                                                                        {React.cloneElement(modelIcons[agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
+                                                                        <span className="ml-1">{agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType}</span>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                    <span className="flex items-center mr-3">
-                                                                        <FiUsers size={10} className="mr-1" /> {agent.userCount || 0}
-                                                                    </span>
-                                                                    <span className="flex items-center mr-3">
-                                                                        <FiMessageSquare size={10} className="mr-1" /> {agent.messageCount || 0}
-                                                                    </span>
-                                                                    {agent.hasWebSearch && (
-                                                                        <span className="flex items-center text-blue-500 dark:text-blue-400">
-                                                                            <FiGlobe size={10} className="mr-1" /> Web
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+
                                                             </div>
-                                                            
+
                                                             {/* Add action buttons for list view */}
                                                             <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <button
@@ -609,21 +590,21 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                             const categoryTitle = category
                                                 .replace(/([A-Z])/g, ' $1')
                                                 .replace(/^./, (str) => str.toUpperCase());
-                                                
+
                                             return (
                                                 <div key={category} className="mb-8">
                                                     <div className="flex items-center justify-between mb-3">
                                                         <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">{categoryTitle}</h3>
                                                         <span className="text-sm text-gray-500 dark:text-gray-400">{agents.length} {agents.length === 1 ? 'agent' : 'agents'}</span>
                                                     </div>
-                                                    
-                                                    <div className={viewMode === 'grid' ? 
-                                                        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : 
+
+                                                    <div className={viewMode === 'grid' ?
+                                                        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" :
                                                         "space-y-3"
                                                     }>
                                                         {agents.map((agent) => (
                                                             viewMode === 'grid' ? (
-                                                                <EnhancedAgentCard 
+                                                                <EnhancedAgentCard
                                                                     key={agent.id || agent.name}
                                                                     agent={agent}
                                                                     onClick={() => handleNavigateToChat(agent.id)}
@@ -632,8 +613,8 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                     onMoveToFolder={handleMoveToFolder}
                                                                 />
                                                             ) : (
-                                                                <div 
-                                                                    key={agent.id || agent.name} 
+                                                                <div
+                                                                    key={agent.id || agent.name}
                                                                     className="flex items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-400/50 dark:hover:border-gray-600 shadow-sm cursor-pointer group"
                                                                     onClick={() => handleNavigateToChat(agent.id)}
                                                                 >
@@ -650,25 +631,12 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                                                                         <div className="flex items-center justify-between">
                                                                             <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{agent.name}</h3>
                                                                             <div className="flex items-center ml-2 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] text-gray-600 dark:text-gray-300">
-                                                                                {React.cloneElement(modelIcons[agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
-                                                                                <span className="ml-1">{agent.modelType}</span>
+                                                                                {React.cloneElement(modelIcons[agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType] || <FaRobot className="text-gray-500" />, { size: 12 })}
+                                                                                <span className="ml-1">{agent.modelType === 'openrouter/auto' ? 'router-engine' : agent.modelType}</span>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                            <span className="flex items-center mr-3">
-                                                                                <FiUsers size={10} className="mr-1" /> {agent.userCount || 0}
-                                                                            </span>
-                                                                            <span className="flex items-center mr-3">
-                                                                                <FiMessageSquare size={10} className="mr-1" /> {agent.messageCount || 0}
-                                                                            </span>
-                                                                            {agent.hasWebSearch && (
-                                                                                <span className="flex items-center text-blue-500 dark:text-blue-400">
-                                                                                    <FiGlobe size={10} className="mr-1" /> Web
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
                                                                     </div>
-                                                                    
+
                                                                     {/* Action buttons for list view */}
                                                                     <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                         <button
@@ -719,7 +687,7 @@ const AdminDashboard = ({ userName = "Admin User" }) => {
                     </div>
                 )}
             </div>
-            
+
             {/* Move to Folder Modal */}
             {showMoveModal && agentToMove && (
                 <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center text-white">Loading...</div>}>

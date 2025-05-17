@@ -10,7 +10,7 @@ const UnauthorizedPage = () => {
                 Sorry, you do not have the necessary permissions to access this page.
             </p>
             <Link
-                to="/" // Link back to the homepage or a default logged-in page
+                to="/"
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300"
             >
                 Go Back Home

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { axiosInstance, setAccessToken, getAccessToken, removeAccessToken } from '../api/axiosInstance';
+import axios from 'axios';
 
 
 const AuthContext = createContext();
@@ -26,35 +27,42 @@ export const AuthProvider = ({ children }) => {
 
 
   const fetchUser = useCallback(async () => {
-    const currentToken = getAccessToken();
-    if (!currentToken) {
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-          const response = await axiosInstance.post('/api/auth/refresh');
-          if (response.data && response.data.accessToken) {
-            updateAccessToken(response.data.accessToken);
-          }
-        } catch (e) {
-          console.error("Failed to use saved user data:", e);
-          setUser(null);
-          localStorage.removeItem('user');
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
     try {
+      const currentToken = getAccessToken();
+      if (!currentToken) {
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+            const response = await axiosInstance.post('/api/auth/refresh');
+            if (response.data && response.data.accessToken) {
+              updateAccessToken(response.data.accessToken);
+            } else {
+              setUser(null);
+              localStorage.removeItem('user');
+              updateAccessToken(null);
+            }
+          } catch (e) {
+            console.error("Failed to use saved user data or refresh token:", e);
+            setUser(null);
+            localStorage.removeItem('user');
+            updateAccessToken(null);
+          }
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       const response = await axiosInstance.get('/api/auth/me');
+
       if (response.data) {
         setUser(response.data);
         localStorage.setItem('user', JSON.stringify(response.data));
       } else {
+        console.error("No user data in response");
         updateAccessToken(null);
         setUser(null);
         localStorage.removeItem('user');
@@ -64,6 +72,7 @@ export const AuthProvider = ({ children }) => {
       updateAccessToken(null);
       setUser(null);
       localStorage.removeItem('user');
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -71,12 +80,9 @@ export const AuthProvider = ({ children }) => {
 
 
   useEffect(() => {
-    if (accessToken) {
-      fetchUser();
-    } else {
-      setLoading(false);
-    }
-  }, [accessToken, fetchUser]);
+    fetchUser();
+  }, [fetchUser]);
+
 
   const handleAuthCallback = useCallback((token, userData) => {
     updateAccessToken(token);
@@ -95,91 +101,130 @@ export const AuthProvider = ({ children }) => {
 
 
   const login = async (email, password) => {
-    setLoading(true);
-    setError(null);
+    if (!email || !password) {
+      setError('Email and password are required.');
+      return;
+    }
     try {
+      setLoading(true);
+      setError(null);
       const response = await axiosInstance.post('/api/auth/login', { email, password });
-      if (response.data?.accessToken && response.data?.user) {
-        updateAccessToken(response.data.accessToken);
-        setUser(response.data.user);
-        if (response.data.user.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/employee');
-        }
+
+      const userData = response.data.user;
+      setUser(userData);
+      updateAccessToken(response.data.accessToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      if (userData.role === 'admin') {
+        navigate('/admin', { replace: true });
       } else {
-        setError('Login failed: Invalid response from server.');
-        updateAccessToken(null);
-        setUser(null);
+        navigate('/employee', { replace: true });
       }
+
+      return response.data;
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-      updateAccessToken(null);
-      setUser(null);
+      const errorMessage = err.response?.data?.message || 'Login failed. Please try again.';
+      setError(errorMessage);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
   const signup = async (name, email, password) => {
-    setLoading(true);
-    setError(null);
     try {
+      setLoading(true);
+      setError(null);
       const response = await axiosInstance.post('/api/auth/signup', { name, email, password });
-      if (response.status === 201) {
-        navigate('/login?signup=success');
-      } else {
-        setError(response.data?.message || 'Signup completed but with unexpected status.');
-      }
+
+      navigate('/verify-email', { state: { email } });
+
+      return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed');
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    setLoading(true);
-    setError(null);
-    const currentToken = getAccessToken();
-
     try {
-      if (currentToken && user) {
-        try {
-          await axiosInstance.put('/api/auth/me/inactive');
-        } catch (inactiveErr) {
-          console.error("Failed to mark user as inactive (proceeding with logout):", inactiveErr.response?.data?.message || inactiveErr.message);
-        }
-      }
-
       await axiosInstance.post('/api/auth/logout');
-
     } catch (err) {
-      setError(err.response?.data?.message || 'Logout failed');
+      console.error('Logout failed:', err);
     } finally {
-      updateAccessToken(null);
+      removeAccessToken();
+      localStorage.removeItem('user');
+      sessionStorage.clear();
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
       setUser(null);
-      delete axiosInstance.defaults.headers.common['Authorization'];
-      setLoading(false);
-      navigate('/login');
+      _setAccessToken(null);
+      navigate('/login', { replace: true });
     }
   };
 
   const googleAuthInitiate = () => {
-    setLoading(true);
+    window.location.href = `${axiosInstance.defaults.baseURL}/api/auth/google`;
+  };
+
+  const forgotPassword = async (email) => {
     try {
-      const redirectUrl = `${axiosInstance.defaults.baseURL}/api/auth/google`;
-
-      updateAccessToken(null);
-      setUser(null);
-
-      window.location.href = redirectUrl;
+      setLoading(true);
+      setError(null);
+      const response = await axiosInstance.post('/api/auth/forget-password', { email });
+      return response.data;
     } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to send password reset email';
+      setError(errorMessage);
+      throw err;
+    } finally {
       setLoading(false);
-      setError('Google authentication initiation failed');
     }
   };
 
+  const resetPassword = async (token, password) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axiosInstance.post(`/api/auth/reset-password/${token}`, { password });
+      return response.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to reset password';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyEmail = async (code) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axiosInstance.post('/api/auth/verify-email', { code });
+
+      if (response.data.success && response.data.user) {
+        const userData = response.data.user;
+
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+
+      }
+
+      return response.data;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Email verification failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthContext.Provider value={{
@@ -193,7 +238,10 @@ export const AuthProvider = ({ children }) => {
       googleAuthInitiate,
       handleAuthCallback,
       fetchUser,
-      setError
+      setError,
+      forgotPassword,
+      resetPassword,
+      verifyEmail
     }}>
       {children}
     </AuthContext.Provider>

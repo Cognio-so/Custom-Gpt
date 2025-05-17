@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
-import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2, FiXCircle, FiExternalLink, FiArrowRight } from 'react-icons/fi';
+import { FiSearch, FiMessageSquare, FiClock, FiCalendar, FiTrash2, FiXCircle, FiExternalLink, FiArrowRight, FiSun, FiMoon } from 'react-icons/fi';
 import { IoEllipse, IoPersonCircleOutline, IoSparkles, IoClose } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
@@ -116,7 +116,7 @@ const HistoryPage = () => {
     const [loadingMessages, setLoadingMessages] = useState(false);
     const messagesEndRef = useRef(null);
     const navigate = useNavigate();
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const user = JSON.parse(localStorage.getItem('user'));
 
     // Scroll to bottom when viewing conversation
@@ -320,11 +320,25 @@ const HistoryPage = () => {
     return (
         <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'
             }`}>
-            <div className="mb-5 flex-shrink-0 text-center md:text-left">
-                <h1 className="text-xl sm:text-2xl font-bold">Conversation History</h1>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    View and continue your previous conversations
-                </p>
+            <div className="mb-5 flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-center sm:text-left">
+                    <h1 className="text-xl sm:text-2xl font-bold">Conversation History</h1>
+                    <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        View and continue your previous conversations
+                    </p>
+                </div>
+                <button
+                    onClick={toggleTheme}
+                    className={`p-2 rounded-full transition-colors self-center sm:self-auto mt-3 sm:mt-0 ${
+                        isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                </button>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4 flex-shrink-0">

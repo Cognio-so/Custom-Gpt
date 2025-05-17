@@ -8,7 +8,9 @@ import {
   IoChevronDown,
   IoEllipse,
   IoArrowBack,
-  IoChatbubblesOutline
+  IoChatbubblesOutline,
+  IoSunnyOutline,
+  IoMoonOutline
 } from 'react-icons/io5';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
@@ -21,7 +23,7 @@ import { teamMembers } from './teamData';
 const HistoryPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, toggleTheme } = useTheme();
   const { user } = useAuth();
 
   // Initialize view type from URL parameter or default to 'personal'
@@ -329,9 +331,23 @@ const HistoryPage = () => {
       <style>{scrollbarHideStyles}</style>
 
       {/* Header section */}
-      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-300 dark:border-gray-800">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white text-center sm:text-left">Activity History</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center sm:text-left">Track actions and changes across your workspace</p>
+      <div className="px-6 pt-6 pb-5 flex-shrink-0 border-b border-gray-300 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Activity History</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track actions and changes across your workspace</p>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className={`p-2 rounded-full transition-colors self-center sm:self-auto mt-3 sm:mt-0 ${
+            isDarkMode 
+              ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {isDarkMode ? <IoSunnyOutline size={20} /> : <IoMoonOutline size={20} />}
+        </button>
       </div>
 
       {/* Controls section */}

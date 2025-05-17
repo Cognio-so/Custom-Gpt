@@ -3,25 +3,24 @@ const Schema = mongoose.Schema;
 const bcrypt = require('bcryptjs');
 
 const userSchema = new Schema({
-    name:{
-        type:String,
-        required:true,
+    name: {
+        type: String,
+        required: true,
     },
-    email:{
-        type:String,
-        required:true,
-        unique:true,
+    email: {
+        type: String,
+        required: true,
+        unique: true,
     },
-    password:{
-        type:String,
-        required:true,
-        select: false
+    password: {
+        type: String,
+        required: true,
     },
-    role:{
-        type:String,
-        enum:['admin','employee'],
-        default:'employee',
-    },  
+    role: {
+        type: String,
+        enum: ['admin', 'employee'],
+        default: 'employee',
+    },
     department: {
         type: String,
         default: 'Not Assigned'
@@ -34,30 +33,20 @@ const userSchema = new Schema({
         type: Date,
         default: null
     },
-    assignedGpts: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'CustomGpt'
-    }],
     apiKeys: {
         type: Object,
         select: false,
         default: {}
-    }
-}, {timestamps:true});
-    
-// Password hash middleware
-userSchema.pre('save', async function(next) {
-    // Only hash the password if it's modified
-    if (!this.isModified('password')) return next();
-    
-    try {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
-        next();
-    } catch (error) {
-        next(error);
-    }
-});
+    },
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
+    resetPasswordToken: String,
+    resetPasswordExpiresAt: Date,
+    verificationToken: String,
+    verificationTokenExpiresAt: Date,
+}, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
 

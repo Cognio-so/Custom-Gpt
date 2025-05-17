@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
-import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo, FiFolder, FiFolderPlus, FiGlobe } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiSearch, FiChevronDown, FiChevronUp, FiPlus, FiInfo, FiFolder, FiFolderPlus, FiGlobe, FiSun, FiMoon } from 'react-icons/fi';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
+import { TbRouter } from 'react-icons/tb';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,6 +13,7 @@ import MoveToFolderModal from './MoveToFolderModal';
 
 // Model icons mapping
 const modelIcons = {
+    'router-engine': <TbRouter className="text-yellow-500" size={18} />,
     'gpt-4': <RiOpenaiFill className="text-green-500" size={18} />,
     'gpt-3.5': <SiOpenai className="text-green-400" size={16} />,
     'claude': <FaRobot className="text-purple-400" size={16} />,
@@ -73,8 +75,8 @@ const GptCard = memo(({ gpt, onDelete, onEdit, formatDate, onNavigate, isDarkMod
             <div className="flex items-start justify-between mb-1.5 sm:mb-2">
                 <h3 className="font-semibold text-base sm:text-lg line-clamp-1 text-gray-900 dark:text-white">{gpt.name}</h3>
                 <div className="flex items-center flex-shrink-0 gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs text-gray-600 dark:text-gray-300">
-                    {React.cloneElement(modelIcons[gpt.model] || <FaRobot className="text-gray-500" />, { size: 12 })}
-                    <span className="hidden sm:inline">{gpt.model}</span>
+                    {React.cloneElement(modelIcons[gpt.model === 'openrouter/auto' ? 'router-engine' : gpt.model] || <FaRobot className="text-gray-500" />, { size: 12 })}
+                    <span className="hidden sm:inline">{gpt.model === 'openrouter/auto' ? 'router-engine' : gpt.model}</span>
                 </div>
             </div>
 
@@ -113,7 +115,7 @@ const CollectionsPage = () => {
     const [sortOption, setSortOption] = useState('newest');
     const [showSortOptions, setShowSortOptions] = useState(false);
     const sortDropdownRef = useRef(null);
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [showMoveModal, setShowMoveModal] = useState(false);
     const [gptToMove, setGptToMove] = useState(null);
@@ -301,9 +303,23 @@ const CollectionsPage = () => {
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-black text-black dark:text-white p-4 sm:p-6 overflow-hidden">
             {/* Header */}
-            <div className="mb-4 md:mb-6 flex-shrink-0 text-center sm:text-left ">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Collections</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your custom GPTs</p>
+            <div className="mb-4 md:mb-6 flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-center sm:text-end">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Collections</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your custom GPTs</p>
+                </div>
+                <button
+                    onClick={toggleTheme}
+                    className={`p-2 rounded-full transition-colors self-center sm:self-auto mt-3 sm:mt-0 ${
+                        isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                </button>
             </div>
 
             {/* Controls: Folder, Search, Sort, Create */}

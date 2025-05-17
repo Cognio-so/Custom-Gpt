@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { FiSearch, FiMessageSquare, FiHeart, FiChevronDown, FiChevronUp, FiXCircle, FiFolder, FiPlus } from 'react-icons/fi';
+import { FiSearch, FiMessageSquare, FiHeart, FiChevronDown, FiChevronUp, FiXCircle, FiFolder, FiPlus, FiSun, FiMoon } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../../api/axiosInstance';
 import { useTheme } from '../../context/ThemeContext';
@@ -54,7 +54,7 @@ const FavoriteCard = memo(({ gpt, formatDate, onChatClick, onRemoveFavorite, onM
                 <h3 className={`font-semibold text-base sm:text-lg line-clamp-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{gpt.name}</h3>
                 <div className={`flex items-center flex-shrink-0 gap-1 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'
                     }`}>
-                    <span>{gpt.model || 'N/A'}</span>
+                    <span>{gpt.model === 'openrouter/auto' ? 'router-engine' : gpt.model || 'N/A'}</span>
                 </div>
             </div>
 
@@ -99,7 +99,7 @@ const FavoritesPage = () => {
     const [showSortOptions, setShowSortOptions] = useState(false);
     const sortDropdownRef = useRef(null);
     const navigate = useNavigate();
-    const { isDarkMode } = useTheme();
+    const { isDarkMode, toggleTheme } = useTheme();
     const [showMoveModal, setShowMoveModal] = useState(false);
     const [gptToMove, setGptToMove] = useState(null);
     const [folders, setFolders] = useState(['All']);
@@ -266,13 +266,26 @@ const FavoritesPage = () => {
     }
 
     return (
-        <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'
-            }`}>
-            <div className="mb-4 md:mb-6 flex-shrink-0 text-center md:text-left">
-                <h1 className="text-xl sm:text-2xl font-bold">Your Favorites</h1>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    GPTs you've marked as favorites for quick access
-                </p>
+        <div className={`flex flex-col h-full p-4 sm:p-6 overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'}`}>
+            <div className="mb-4 md:mb-6 flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-center sm:text-left">Your Favorites</h1>
+                    <p className={`text-sm mt-1 text-center sm:text-left ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        GPTs you've marked as favorites for quick access
+                    </p>
+                </div>
+                <button
+                    onClick={toggleTheme}
+                    className={`p-2 rounded-full transition-colors self-center sm:self-auto mt-3 sm:mt-0 ${
+                        isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
+                </button>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-4 flex-shrink-0">
