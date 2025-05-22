@@ -18,7 +18,8 @@ const {
     getUserFavorites,
     addToFavorites,
     removeFromFavorites,
-    updateUserGptFolder
+    updateUserGptFolder,
+    downloadKnowledgeFile
 } = require('../controllers/customGptController');
 const { protectRoute } = require('../middleware/authMiddleware');
 
@@ -61,5 +62,8 @@ router.patch('/user/assigned/:gptId/folder', updateUserGptFolder);
 
 // Add this to your existing routes
 router.put('/user/folder/:gptId', updateGptFolder);
+
+// Add this route to download knowledge files
+router.get('/:id/knowledge/:fileIndex/download', downloadKnowledgeFile);
 
 module.exports = router; 

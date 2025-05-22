@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IoAddOutline, IoCloseOutline, IoPersonCircleOutline, IoInformationCircleOutline, IoSearchOutline, IoSparklesOutline, IoArrowBackOutline } from 'react-icons/io5';
-import { FaBox, FaUpload, FaGlobe, FaChevronDown } from 'react-icons/fa';
+import { FaBox, FaUpload, FaGlobe, FaChevronDown, FaDownload } from 'react-icons/fa';
 import { LuBrain } from 'react-icons/lu';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { BiLogoMeta } from 'react-icons/bi';
@@ -532,6 +532,45 @@ When providing code examples:
         }
     };
 
+    // Updated function to handle file downloads
+    const handleFileDownload = async (file) => {
+        if (file.isUploaded) {
+            try {
+                // For uploaded files, get a presigned URL from the backend
+                const response = await axiosInstance.get(
+                    `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts/${editGptId}/knowledge/${file.index}/download`,
+                    { withCredentials: true }
+                );
+                
+                if (response.data.success && response.data.downloadUrl) {
+                    // Create an anchor element and trigger download with the presigned URL
+                    const link = document.createElement('a');
+                    link.href = response.data.downloadUrl;
+                    link.download = file.name;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast.success(`Downloading ${file.name}`);
+                } else {
+                    toast.error("Failed to generate download link");
+                }
+            } catch (error) {
+                console.error("Error downloading file:", error);
+                toast.error("Failed to download file");
+            }
+        } else {
+            // Handle local files (not yet uploaded)
+            const url = URL.createObjectURL(file.file);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = file.name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    };
+
     if (isLoading && isEditMode) {
         return (
             <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-[#1A1A1A]">
@@ -797,7 +836,14 @@ When providing code examples:
                                     <ul className="space-y-1">
                                         {knowledgeFiles.map((file, index) => (
                                             <li key={index} className="flex justify-between items-center bg-white dark:bg-[#262626] px-3 py-1.5 rounded text-xs md:text-sm border border-gray-400 dark:border-gray-700">
-                                                <span className="text-gray-700 dark:text-gray-300 truncate mr-2">{file.name}</span>
+                                                <span 
+                                                    className="text-gray-700 dark:text-gray-300 truncate mr-2 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer flex items-center"
+                                                    onClick={() => handleFileDownload(file)}
+                                                    title={`Click to download ${file.name}`}
+                                                >
+                                                    <FaDownload className="mr-1 text-gray-500 dark:text-gray-400" size={12} />
+                                                    {file.name}
+                                                </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => removeKnowledgeFile(index)}

@@ -928,6 +928,62 @@ const updateUserGptFolder = async (req, res) => {
   }
 };
 
+// Download a knowledge file with a presigned URL
+const downloadKnowledgeFile = async (req, res) => {
+  try {
+    const { id, fileIndex } = req.params;
+    const customGpt = await CustomGpt.findById(id);
+
+    if (!customGpt) {
+      return res.status(404).json({
+        success: false,
+        message: 'Custom GPT not found'
+      });
+    }
+
+    // Authorize the user
+    if (customGpt.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this file'
+      });
+    }
+
+    // Check if the file exists
+    if (!customGpt.knowledgeFiles[fileIndex]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Knowledge file not found'
+      });
+    }
+
+    const file = customGpt.knowledgeFiles[fileIndex];
+    
+    // Extract the key from the fileUrl if it's a full URL
+    let key = file.fileUrl;
+    if (key.startsWith('http')) {
+      // Extract the key from the URL
+      key = key.split('/').slice(3).join('/');
+    }
+
+    // Generate a presigned download URL
+    const { getDownloadUrl } = require('../lib/r2');
+    const downloadUrl = await getDownloadUrl(key, file.name);
+
+    res.status(200).json({
+      success: true,
+      downloadUrl
+    });
+  } catch (error) {
+    console.error('Error generating download URL:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate download URL',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createCustomGpt,
   getUserCustomGpts,
@@ -946,5 +1002,6 @@ module.exports = {
   getUserFavorites,
   addToFavorites,
   removeFromFavorites,
-  updateUserGptFolder
+  updateUserGptFolder,
+  downloadKnowledgeFile
 }; 

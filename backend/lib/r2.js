@@ -1,4 +1,5 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
@@ -43,11 +44,9 @@ async function uploadToR2(fileBuffer, fileName, folder = '') {
         // Upload to R2
         await s3Client.send(new PutObjectCommand(uploadParams));
         
-        // Generate the public URL
-        const fileUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
-        
+        // Store file info in a format that can be used to generate presigned URLs later
         return {
-            fileUrl,
+            fileUrl: key, // Just store the key instead of a full URL
             key,
         };
     } catch (error) {
@@ -76,6 +75,29 @@ async function deleteFromR2(key) {
 }
 
 /**
+ * Generate a presigned URL for downloading a file
+ * @param {string} key - The file key
+ * @param {string} originalFilename - The original filename to use for download
+ * @returns {Promise<string>} - Presigned URL
+ */
+async function getDownloadUrl(key, originalFilename) {
+    const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+        ResponseContentDisposition: `attachment; filename="${encodeURIComponent(originalFilename)}"`,
+    });
+
+    try {
+        // Generate presigned URL that expires in 15 minutes
+        const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 });
+        return signedUrl;
+    } catch (error) {
+        console.error('Error generating presigned URL:', error);
+        throw new Error('Failed to generate download URL');
+    }
+}
+
+/**
  * Get content type based on file extension
  * @param {string} extension - File extension
  * @returns {string} - MIME type
@@ -98,4 +120,5 @@ function getContentType(extension) {
 module.exports = {
     uploadToR2,
     deleteFromR2,
+    getDownloadUrl,
 }; 
