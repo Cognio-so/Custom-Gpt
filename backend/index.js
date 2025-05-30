@@ -11,6 +11,7 @@ const customGptRoutes = require('./routes/customGptRoutes');
 const authRoutes = require('./routes/authRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 const chatHistoryRoutes = require('./routes/chatHistory');
+const mcpRoutes = require('./routes/mcpRoutes');
 
 require('./config/passport');
 
@@ -44,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth', invitationRoutes);
 app.use('/api/custom-gpts', customGptRoutes);
 app.use('/api/chat-history', chatHistoryRoutes);
+app.use('/api/mcp-configs', mcpRoutes);
 
 connectDB()
   .then(() => console.log('MongoDB connected at server startup'))
@@ -58,6 +60,5 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 module.exports = app;
-
 
 

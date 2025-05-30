@@ -18,6 +18,9 @@ import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
 import { RiSunFill, RiMoonFill } from 'react-icons/ri';
+import { TbRouter } from 'react-icons/tb';
+import { FaServer } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
 
 const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
@@ -130,6 +133,11 @@ const AdminChat = () => {
     const [currentConversationId, setCurrentConversationId] = useState(null);
     const [loading, setLoading] = useState({ message: false });
     const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+    const [apiKeys, setApiKeys] = useState({});
+
+    // New state for MCP selection
+    const [selectedMcpServerName, setSelectedMcpServerName] = useState(null);
+    const [savedMcpConfigs, setSavedMcpConfigs] = useState([]);
 
     // Use effect to handle user data changes
     useEffect(() => {
@@ -138,7 +146,48 @@ const AdminChat = () => {
         }
     }, [user]);
 
-    // Notify backend when GPT opens to trigger indexing
+    // Create a better fetchApiKeys function with retry logic
+    const fetchApiKeysFromBackend = async (retry = 3) => {
+        try {
+            if (!user?._id) {
+                console.warn("Cannot fetch API keys - user not authenticated yet");
+                return {};
+            }
+            
+            console.log("Fetching API keys from backend...");
+            const response = await axiosInstance.get('/api/auth/user/api-keys', {
+                withCredentials: true
+            });
+            
+            if (response.data && response.data.success) {
+                const keys = response.data.apiKeys || {};
+                console.log("API keys fetched successfully:", Object.keys(keys));
+                // Update state with the fetched keys
+                setApiKeys(keys);
+                return keys;
+            }
+            return {};
+        } catch (error) {
+            console.error("Failed to fetch API keys from server:", error);
+            if (retry > 0) {
+                console.log(`Retrying API key fetch (${retry} attempts left)...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return fetchApiKeysFromBackend(retry - 1);
+            }
+            return {};
+        }
+    };
+
+    // Add a useEffect to fetch API keys after user is authenticated
+    useEffect(() => {
+        if (user?._id) {
+            fetchApiKeysFromBackend().then(keys => {
+                console.log("Initial API keys fetched:", Object.keys(keys));
+            });
+        }
+    }, [user]);
+
+    // Update notifyGptOpened function
     const notifyGptOpened = async (gptData, userData) => {
         try {
             if (!gptData || !userData || !gptData._id || hasNotifiedGptOpened) {
@@ -151,13 +200,14 @@ const AdminChat = () => {
 
             const useHybridSearch = gptData.capabilities?.hybridSearch || false;
             
-            // Get API keys from localStorage
-            let apiKeys = {};
-            try {
-                apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
-            } catch (e) {
-                console.warn("Failed to parse API keys from localStorage");
-            }
+            // Get API keys from backend instead of localStorage
+            const apiKeys = await fetchApiKeysFromBackend();
+            console.log("Fetched API keys from backend:", Object.keys(apiKeys));
+
+            console.log("GPT MCP settings:", {
+                mcpEnabled: gptData.mcpEnabled,
+                mcpSchemaLength: gptData.mcpSchema?.length || 0
+            });
 
             const response = await axios.post(
                 `${PYTHON_URL}/gpt-opened`,
@@ -171,9 +221,11 @@ const AdminChat = () => {
                         model: gptData.model,
                         instructions: gptData.instructions,
                         capabilities: gptData.capabilities,
-                        use_hybrid_search: useHybridSearch
+                        use_hybrid_search: useHybridSearch,
+                        mcpEnabled: gptData.mcpEnabled || false,
+                        mcpSchema: gptData.mcpSchema || null
                     },
-                    api_keys: apiKeys // Add API keys to the payload
+                    api_keys: apiKeys
                 },
                 {
                     headers: {
@@ -205,6 +257,7 @@ const AdminChat = () => {
             setMessages([]);
             setConversationMemory([]);
             setIsInitialLoading(false);
+            setSelectedMcpServerName(null);
             return;
         }
         if (authLoading) {
@@ -216,12 +269,14 @@ const AdminChat = () => {
             setGptData({ _id: gptId, name: "Admin Chat", description: "Admin user required.", model: "gpt-4o-mini" });
             setMessages([]);
             setConversationMemory([]);
+            setSelectedMcpServerName(null);
             return;
         }
         if (user.role !== 'admin') {
             console.warn("AdminChat: Non-admin user trying to access.");
             setIsInitialLoading(false);
             navigate('/user/collections');
+            setSelectedMcpServerName(null);
             return;
         }
 
@@ -241,10 +296,14 @@ const AdminChat = () => {
                     const sanitizedGptName = (fetchedGptData.name || 'gpt').replace(/[^a-zA-Z0-9]/g, '_');
                     setCollectionName(`kb_${sanitizedEmail}_${sanitizedGptName}_${gptId}`);
                     notifyGptOpened(fetchedGptData, user).catch(err => console.warn("[AdminChat] Notify error:", err));
+
+                    setSelectedMcpServerName(null);
+
                 } else {
                     console.warn("[AdminChat] Failed GPT fetch:", gptResponse.data);
                     fetchedGptData = { _id: gptId, name: "Assistant", description: "Details unavailable.", model: "gpt-4o-mini" };
                     setGptData(fetchedGptData);
+                    setSelectedMcpServerName(null);
                 }
 
                 if (currentConversationId) {
@@ -283,6 +342,7 @@ const AdminChat = () => {
                 setGptData(fetchedGptData || { _id: gptId, name: "Assistant", description: "Error loading data.", model: "gpt-4o-mini" });
                 setMessages([{ id: Date.now(), role: 'system', content: `Error loading chat data: ${err.message}`, timestamp: new Date() }]);
                 setConversationMemory([]);
+                setSelectedMcpServerName(null);
             } finally {
                 setIsInitialLoading(false);
             }
@@ -294,7 +354,7 @@ const AdminChat = () => {
             setIsInitialLoading(false);
             setLoading(prev => ({ ...prev, message: false }));
         };
-    }, [gptId, user, authLoading, currentConversationId]);
+    }, [gptId, user, authLoading, currentConversationId, navigate]);
 
     const handlePromptClick = (item) => {
         handleChatSubmit(item.prompt);
@@ -340,6 +400,7 @@ const AdminChat = () => {
         }
     };
 
+    // Update handleChatSubmit function
     const handleChatSubmit = async (message) => {
         if (!message.trim()) return;
 
@@ -381,13 +442,60 @@ const AdminChat = () => {
             setConversationMemory(updatedMemory);
 
             const useHybridSearch = gptData?.capabilities?.hybridSearch || false;
+            const fetchedApiKeys = await fetchApiKeysFromBackend(); // Fetch latest keys
+
+            // Updated MCP logic - only handle saved MCPs:
+            const mcpEnabledForQuery = !!(gptData?.mcpEnabled && selectedMcpServerName);
+            let mcpSchemaForQuery = null;
+
+            if (mcpEnabledForQuery && selectedMcpServerName) {
+                // Find the selected saved MCP config
+                const savedConfig = savedMcpConfigs.find(c => c._id === selectedMcpServerName);
+                if (savedConfig) {
+                    // Ensure the schema is properly formatted as a JSON string
+                    try {
+                        // Parse to validate it's valid JSON, then stringify to ensure it's a string
+                        const parsedSchema = JSON.parse(savedConfig.schema);
+                        
+                        // Check if it's the full mcpServers structure or a single server config
+                        if (parsedSchema.mcpServers && typeof parsedSchema.mcpServers === 'object') {
+                            // It's the full structure, extract the first server
+                            const serverNames = Object.keys(parsedSchema.mcpServers);
+                            if (serverNames.length > 0) {
+                                const firstServerName = serverNames[0];
+                                const serverConfig = parsedSchema.mcpServers[firstServerName];
+                                // Add the server name to the config for logging
+                                serverConfig.name = savedConfig.name || firstServerName;
+                                mcpSchemaForQuery = JSON.stringify(serverConfig);
+                            } else {
+                                throw new Error("No servers found in mcpServers configuration");
+                            }
+                        } else {
+                            // It's already a single server config, just ensure it has a name
+                            parsedSchema.name = savedConfig.name;
+                            mcpSchemaForQuery = JSON.stringify(parsedSchema);
+                        }
+                        
+                        console.log("Using saved MCP schema:", selectedMcpServerName, savedConfig.name);
+                        console.log("MCP Schema being sent to backend:", mcpSchemaForQuery);
+                    } catch (parseError) {
+                        console.error("Invalid MCP schema JSON:", parseError);
+                        mcpSchemaForQuery = null;
+                        // Show error to user
+                        toast.error("Selected MCP configuration has invalid JSON format: " + parseError.message);
+                    }
+                } else {
+                    console.warn("Selected MCP config not found:", selectedMcpServerName);
+                    mcpSchemaForQuery = null;
+                }
+            }
 
             const payload = {
                 message,
                 gpt_id: gptId,
                 user_email: user?.email || 'unknown_admin',
                 gpt_name: gptData?.name || 'unknown_gpt',
-                user_documents: userDocuments,
+                user_documents: userDocuments, // These are R2 keys/URLs from file uploads to chat context
                 model: gptData?.model || 'gpt-4o-mini',
                 memory: updatedMemory,
                 history: messages.slice(-6).map(msg => ({
@@ -396,8 +504,17 @@ const AdminChat = () => {
                 })),
                 use_hybrid_search: useHybridSearch,
                 system_prompt: gptData?.instructions || null,
-                web_search_enabled: gptData?.capabilities?.webBrowsing || false
+                web_search_enabled: gptData?.capabilities?.webBrowsing || false,
+                mcp_enabled: mcpEnabledForQuery,
+                mcp_schema: mcpSchemaForQuery,
+                api_keys: fetchedApiKeys // Pass the fetched API keys
             };
+            
+            console.log("Sending chat with payload:", {
+                ...payload,
+                mcp_enabled: payload.mcp_enabled,
+                mcp_schema: payload.mcp_schema ? "MCP Schema Present" : "No MCP Schema"
+            });
 
             if (!payload.user_email) {
                 payload.user_email = user?.email || 'admin@system.com';
@@ -509,6 +626,7 @@ const AdminChat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // Update handleFileUpload function
     const handleFileUpload = async (files) => {
         if (!files.length || !gptData) return;
 
@@ -531,6 +649,10 @@ const AdminChat = () => {
             formData.append('collection_name', collectionName || gptData._id);
             formData.append('is_user_document', 'true');
             formData.append('system_prompt', gptData?.instructions || '');
+
+            // Get API keys from backend and add to form data
+            const apiKeys = await fetchApiKeysFromBackend();
+            formData.append('api_keys', JSON.stringify(apiKeys));
 
             const startTime = Date.now();
             const uploadDuration = 1500;
@@ -745,6 +867,7 @@ const AdminChat = () => {
 
     // Determine if the web search toggle should be shown
     const showWebSearchToggle = gptData?.capabilities?.webBrowsing || false;
+    const showMcpSelector = gptData?.mcpEnabled && savedMcpConfigs.length > 0;
 
     const handleNewChat = () => {
         setMessages([]);
@@ -752,6 +875,23 @@ const AdminChat = () => {
         setHasInteracted(false);
         setUserDocuments([]);
         setUploadedFiles([]);
+    };
+
+    useEffect(() => {
+        if (gptData?.mcpEnabled) {
+            fetchSavedMcpConfigs();
+        }
+    }, [gptData?.mcpEnabled]);
+
+    const fetchSavedMcpConfigs = async () => {
+        try {
+            const response = await axiosInstance.get('/api/mcp-configs', { withCredentials: true });
+            if (response.data?.success) {
+                setSavedMcpConfigs(response.data.mcpConfigs || []);
+            }
+        } catch (error) {
+            console.error("Error fetching saved MCP configurations:", error);
+        }
     };
 
     return (
@@ -783,17 +923,41 @@ const AdminChat = () => {
                                 <span className="mr-1">New Chat</span>
                                 {gptData.model && (
                                     <div className="flex items-center ml-2 text-xs md:text-sm px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                                        {modelIcons[gptData.model === 'openrouter/auto' ? 'router-engine' : gptData.model] || null}
-                                        <span>{gptData.model === 'openrouter/auto' ? 'router-engine' : (gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model)}</span>
+                                        {modelIcons[getDisplayModelName(gptData.model)] || null}
+                                        <span>{getDisplayModelName(gptData.model) === 'gpt-4o-mini' ? 'GPT-4o Mini' : getDisplayModelName(gptData.model)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* Updated MCP Server Selector - only show saved MCPs */}
+                        {gptData?.mcpEnabled && savedMcpConfigs.length > 0 && (
+                            <div className="relative flex items-center">
+                                <FaServer className={`mr-1 ${selectedMcpServerName ? 'text-black' : 'text-black dark:text-white'}`} size={14} />
+                                <select
+                                    value={selectedMcpServerName || ""}
+                                    onChange={(e) => setSelectedMcpServerName(e.target.value || null)}
+                                    className={`border rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none pr-7 ${
+                                        selectedMcpServerName 
+                                            ? 'bg-black dark:bg-gray-800 text-green-500 dark:text-green-500 '
+                                            : 'bg-black dark:bg-gray-700 text-white dark:text-white'
+                                    }`}
+                                    title="Select MCP Server"
+                                >
+                                    <option value="">No MCP</option>
+                                    {savedMcpConfigs.map(config => (
+                                        <option key={config._id} value={config._id}>
+                                            {config.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <TbRouter className="absolute right-2 top-1/2 transform -translate-y-1/2 text-black dark:text-white bg-white dark:bg-black/10 pointer-events-none" size={14}/>
+                            </div>
+                        )}
                         <button
                             onClick={toggleTheme}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
                             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
                             {isDarkMode ? 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IoAddOutline, IoCloseOutline, IoPersonCircleOutline, IoInformationCircleOutline, IoSearchOutline, IoSparklesOutline, IoArrowBackOutline } from 'react-icons/io5';
-import { FaBox, FaUpload, FaGlobe, FaChevronDown, FaDownload } from 'react-icons/fa';
+import { FaBox, FaUpload, FaGlobe, FaChevronDown, FaServer, FaPlus } from 'react-icons/fa';
 import { LuBrain } from 'react-icons/lu';
 import { SiOpenai, SiGooglegemini } from 'react-icons/si';
 import { BiLogoMeta } from 'react-icons/bi';
@@ -43,12 +43,14 @@ When providing code examples:
         description: 'A helpful assistant that can answer questions about various topics.',
         instructions: defaultInstructions,
         conversationStarter: '',
+        mcpSchema: '',
     });
 
     // Simplified capabilities state
     const [capabilities, setCapabilities] = useState({
         webBrowsing: true,
-        hybridSearch: false
+        hybridSearch: false,
+        mcpEnabled: false
     });
 
     const [imagePreview, setImagePreview] = useState(null);
@@ -61,6 +63,8 @@ When providing code examples:
     const [isLoading, setIsLoading] = useState(false); // Keep for initial fetch in edit mode
     const [isSaving, setIsSaving] = useState(false); // New state for save button
     const [isEditMode, setIsEditMode] = useState(false);
+    const [savedMcpConfigs, setSavedMcpConfigs] = useState([]);
+    const [selectedSavedMcpId, setSelectedSavedMcpId] = useState(null);
 
     // Check if we're in edit mode
     useEffect(() => {
@@ -87,6 +91,7 @@ When providing code examples:
                 description: gpt.description,
                 instructions: gpt.instructions,
                 conversationStarter: gpt.conversationStarter || '',
+                mcpSchema: gpt.mcpSchema || '',
             });
 
             // Set other states
@@ -94,8 +99,9 @@ When providing code examples:
             setCapabilities({
                 ...capabilities, // Keep default values
                 ...gpt.capabilities, // Override with existing values
-                // Ensure hybridSearch is defined even if not in original data
-                hybridSearch: gpt.capabilities?.hybridSearch ?? false
+                // Ensure values are defined even if not in original data
+                hybridSearch: gpt.capabilities?.hybridSearch ?? false,
+                mcpEnabled: gpt.mcpEnabled ?? false
             });
 
             // Set image preview if exists
@@ -415,7 +421,7 @@ When providing code examples:
         try {
             // Always trigger indexing even if there are no files to save system prompt
             const response = await axios.post(
-                `${PYTHON_URL}/index-knowledge`,
+                `${PYTHON_URL}/setup-gpt-context`,
                 {
                     file_urls: fileUrls,
                     user_email: email || "user@example.com",
@@ -431,7 +437,9 @@ When providing code examples:
                         description: formData.description,
                         instructions: formData.instructions,
                         conversationStarter: formData.conversationStarter,
-                        use_hybrid_search: capabilities.hybridSearch
+                        use_hybrid_search: capabilities.hybridSearch,
+                        mcpEnabled: capabilities.mcpEnabled || false,
+                        mcpSchema: capabilities.mcpEnabled ? formData.mcpSchema : null
                     }
                 }
             );
@@ -461,6 +469,19 @@ When providing code examples:
             apiFormData.append('conversationStarter', formData.conversationStarter);
             apiFormData.append('model', selectedModel);
             apiFormData.append('capabilities', JSON.stringify(capabilities));
+            apiFormData.append('mcpEnabled', capabilities.mcpEnabled ? 'true' : 'false');
+            
+            // If mcpEnabled and a saved MCP is selected, use that schema
+            if (capabilities.mcpEnabled && selectedSavedMcpId) {
+                const selectedMcp = savedMcpConfigs.find(mcp => mcp._id === selectedSavedMcpId);
+                if (selectedMcp) {
+                    apiFormData.append('mcpSchema', selectedMcp.schema);
+                } else {
+                    apiFormData.append('mcpSchema', formData.mcpSchema || '');
+                }
+            } else {
+                apiFormData.append('mcpSchema', formData.mcpSchema || '');
+            }
 
             // Add image if selected
             if (imageFile) {
@@ -532,42 +553,73 @@ When providing code examples:
         }
     };
 
-    // Updated function to handle file downloads
-    const handleFileDownload = async (file) => {
-        if (file.isUploaded) {
-            try {
-                // For uploaded files, get a presigned URL from the backend
-                const response = await axiosInstance.get(
-                    `${axiosInstance.defaults.baseURL.endsWith('/api') ? axiosInstance.defaults.baseURL : `${axiosInstance.defaults.baseURL}/api`}/custom-gpts/${editGptId}/knowledge/${file.index}/download`,
-                    { withCredentials: true }
-                );
-                
-                if (response.data.success && response.data.downloadUrl) {
-                    // Create an anchor element and trigger download with the presigned URL
-                    const link = document.createElement('a');
-                    link.href = response.data.downloadUrl;
-                    link.download = file.name;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    toast.success(`Downloading ${file.name}`);
-                } else {
-                    toast.error("Failed to generate download link");
-                }
-            } catch (error) {
-                console.error("Error downloading file:", error);
-                toast.error("Failed to download file");
+    // Add this useEffect to fetch saved MCP configs
+    useEffect(() => {
+        if (capabilities.mcpEnabled) {
+            fetchSavedMcpConfigs();
+        }
+    }, [capabilities.mcpEnabled]);
+
+    // Add this function to fetch saved MCP configs
+    const fetchSavedMcpConfigs = async () => {
+        try {
+            const response = await axiosInstance.get('/api/mcp-configs', { withCredentials: true });
+            if (response.data?.success) {
+                setSavedMcpConfigs(response.data.mcpConfigs || []);
             }
-        } else {
-            // Handle local files (not yet uploaded)
-            const url = URL.createObjectURL(file.file);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = file.name;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error fetching saved MCP configurations:", error);
+            toast.error("Failed to load saved MCP configurations");
+        }
+    };
+
+    // Add this handler for selecting a saved MCP
+    const handleSelectSavedMcp = (mcpId) => {
+        const selectedMcp = savedMcpConfigs.find(mcp => mcp._id === mcpId);
+        setSelectedSavedMcpId(mcpId);
+        
+        if (selectedMcp) {
+            setFormData({
+                ...formData,
+                mcpSchema: selectedMcp.schema
+            });
+        }
+    };
+
+    // Add this handler to save current MCP schema
+    const handleSaveCurrentMcpSchema = async () => {
+        try {
+            // Basic validation
+            if (!formData.mcpSchema) {
+                toast.error("MCP schema cannot be empty");
+                return;
+            }
+
+            // Validate JSON
+            try {
+                JSON.parse(formData.mcpSchema);
+            } catch (e) {
+                toast.error("Invalid JSON format");
+                return;
+            }
+
+            const mcpName = prompt("Enter a name for this MCP configuration:", "My MCP Config");
+            if (!mcpName) return;
+
+            const response = await axiosInstance.post('/api/mcp-configs', {
+                name: mcpName,
+                schema: formData.mcpSchema,
+                isPublic: false
+            }, { withCredentials: true });
+
+            if (response.data?.success) {
+                toast.success("MCP configuration saved successfully");
+                fetchSavedMcpConfigs();
+                setSelectedSavedMcpId(response.data.mcpConfig._id);
+            }
+        } catch (error) {
+            console.error("Error saving MCP configuration:", error);
+            toast.error("Failed to save MCP configuration");
         }
     };
 
@@ -794,6 +846,65 @@ When providing code examples:
                             </label>
                         </div>
 
+                        {/* MCP Capability */}
+                        <div className="flex items-center justify-between pt-2">
+                            <div>
+                                <div className="flex items-center">
+                                    <TbRouter className="text-gray-500 dark:text-gray-400 mr-2" size={14} />
+                                    <label htmlFor="mcpEnabledToggle" className="text-xs md:text-sm font-medium text-gray-600 dark:text-gray-300 cursor-pointer">Multi-Chain Processing</label>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Enable advanced processing with external services</p>
+                            </div>
+                            <label htmlFor="mcpEnabledToggle" className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    id="mcpEnabledToggle"
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={capabilities.mcpEnabled || false}
+                                    onChange={() => handleCapabilityChange('mcpEnabled')}
+                                />
+                                <div className="w-9 h-5 md:w-11 md:h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:after:bg-white after:border-gray-300 dark:after:border-gray-600 after:border after:rounded-full after:h-4 after:w-4 md:after:h-5 md:after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+
+                        {/* MCP Configuration */}
+                        {capabilities.mcpEnabled && (
+                            <div className="mt-3">
+                                <label className="block text-xs md:text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">MCP Configuration</label>
+                                <div className="relative">
+                                    <textarea
+                                        name="mcpSchema"
+                                        value={formData.mcpSchema || ''}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-white dark:bg-[#262626] border border-gray-400 dark:border-gray-700 rounded-md px-3 py-2 text-xs md:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[120px] md:min-h-[150px] font-mono"
+                                        placeholder={`{
+"mcpServers": {
+"example-server": {
+    "command": "python",
+    "args": ["path/to/script.py"],
+    "env": {
+    "API_KEY": "your_api_key"
+    }
+}
+}
+}`}
+                                    />
+                                    <div className="mt-1 flex justify-between items-center">
+                                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                                            Define external services to handle specialized tasks
+                                        </div>
+                                        <button
+                                            onClick={handleSaveCurrentMcpSchema}
+                                            className="flex items-center text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                                        >
+                                            <FaPlus className="mr-1" size={10} />
+                                            Save Config
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Conversation Starter */}
                         <div>
                             <label className="block text-xs md:text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Conversation Starter</label>
@@ -836,14 +947,7 @@ When providing code examples:
                                     <ul className="space-y-1">
                                         {knowledgeFiles.map((file, index) => (
                                             <li key={index} className="flex justify-between items-center bg-white dark:bg-[#262626] px-3 py-1.5 rounded text-xs md:text-sm border border-gray-400 dark:border-gray-700">
-                                                <span 
-                                                    className="text-gray-700 dark:text-gray-300 truncate mr-2 hover:text-blue-500 dark:hover:text-blue-400 cursor-pointer flex items-center"
-                                                    onClick={() => handleFileDownload(file)}
-                                                    title={`Click to download ${file.name}`}
-                                                >
-                                                    <FaDownload className="mr-1 text-gray-500 dark:text-gray-400" size={12} />
-                                                    {file.name}
-                                                </span>
+                                                <span className="text-gray-700 dark:text-gray-300 truncate mr-2">{file.name}</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => removeKnowledgeFile(index)}
