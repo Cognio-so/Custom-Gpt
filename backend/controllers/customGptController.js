@@ -254,8 +254,11 @@ const updateCustomGpt = async (req, res) => {
     if (imageFile) {
       // Delete old image if exists
       if (customGpt.imageUrl) {
-        // Extract key from imageUrl
-        const key = customGpt.imageUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+        // Extract key from imageUrl (handle both full URLs and keys)
+        let key = customGpt.imageUrl;
+        if (process.env.R2_PUBLIC_URL && customGpt.imageUrl.startsWith(process.env.R2_PUBLIC_URL)) {
+          key = customGpt.imageUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+        }
         await deleteFromR2(key);
       }
 
@@ -272,7 +275,10 @@ const updateCustomGpt = async (req, res) => {
       // Delete old files if needed and specified in request
       if (req.body.replaceKnowledge === 'true' && customGpt.knowledgeFiles.length > 0) {
         for (const file of customGpt.knowledgeFiles) {
-          const key = file.fileUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+          let key = file.fileUrl;
+          if (process.env.R2_PUBLIC_URL && file.fileUrl.startsWith(process.env.R2_PUBLIC_URL)) {
+            key = file.fileUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+          }
           await deleteFromR2(key);
         }
         customGpt.knowledgeFiles = [];
@@ -339,13 +345,19 @@ const deleteCustomGpt = async (req, res) => {
 
     // Delete associated files from R2
     if (customGpt.imageUrl) {
-      const imageKey = customGpt.imageUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+      let imageKey = customGpt.imageUrl;
+      if (process.env.R2_PUBLIC_URL && customGpt.imageUrl.startsWith(process.env.R2_PUBLIC_URL)) {
+        imageKey = customGpt.imageUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+      }
       await deleteFromR2(imageKey);
     }
 
     // Delete knowledge files
     for (const file of customGpt.knowledgeFiles) {
-      const fileKey = file.fileUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+      let fileKey = file.fileUrl;
+      if (process.env.R2_PUBLIC_URL && file.fileUrl.startsWith(process.env.R2_PUBLIC_URL)) {
+        fileKey = file.fileUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+      }
       await deleteFromR2(fileKey);
     }
 
@@ -397,7 +409,10 @@ const deleteKnowledgeFile = async (req, res) => {
     }
 
     // Delete the file from R2
-    const fileKey = customGpt.knowledgeFiles[fileIndex].fileUrl.replace(process.env.R2_PUBLIC_URL + '/', '');
+    let fileKey = customGpt.knowledgeFiles[fileIndex].fileUrl;
+    if (process.env.R2_PUBLIC_URL && fileKey.startsWith(process.env.R2_PUBLIC_URL)) {
+      fileKey = fileKey.replace(process.env.R2_PUBLIC_URL + '/', '');
+    }
     await deleteFromR2(fileKey);
 
     // Remove the file from the array

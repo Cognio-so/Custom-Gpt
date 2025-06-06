@@ -44,9 +44,13 @@ async function uploadToR2(fileBuffer, fileName, folder = '') {
         // Upload to R2
         await s3Client.send(new PutObjectCommand(uploadParams));
         
-        // Store file info in a format that can be used to generate presigned URLs later
+        // Construct the full public URL
+        const fullUrl = process.env.R2_PUBLIC_URL 
+            ? `${process.env.R2_PUBLIC_URL}/${key}`
+            : key; // Fallback to just the key if no public URL is set
+        
         return {
-            fileUrl: key, // Just store the key instead of a full URL
+            fileUrl: fullUrl, // Return the full public URL
             key,
         };
     } catch (error) {
