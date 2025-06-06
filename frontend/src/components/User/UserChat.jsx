@@ -997,7 +997,7 @@ const UserChat = () => {
                         {/* Show the GPT name when it's available */}
                         {gptData && (
                             <div className="ml-2 text-sm md:text-base font-medium flex items-center">
-                                <span className="mr-1">New Chat</span>
+                                <span className="mr-1">{gptData.name}</span>
                                 {gptData.model && (
                                     <div className={`flex items-center ml-2 text-xs md:text-sm px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
                                         {modelIcons[gptData.model === 'openrouter/auto' ? 'router-engine' : gptData.model] || null}
