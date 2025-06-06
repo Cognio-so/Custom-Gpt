@@ -18,9 +18,6 @@ import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
 import { RiSunFill, RiMoonFill } from 'react-icons/ri';
-import { TbRouter } from 'react-icons/tb';
-import { FaServer } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
 
 const PYTHON_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
@@ -89,6 +86,49 @@ const MarkdownStyles = () => (
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
         }
+
+        .progress-message {
+            border-left: 3px solid #3498db;
+            padding-left: 10px;
+            color: #555;
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        .progress-item {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .typing-animation span {
+            width: 5px;
+            height: 5px;
+            background-color: currentColor;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 1px;
+            animation: typing 1.3s infinite ease-in-out;
+        }
+
+        .typing-animation span:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-animation span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-animation span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
     `}} />
 );
 
@@ -134,10 +174,6 @@ const AdminChat = () => {
     const [loading, setLoading] = useState({ message: false });
     const [webSearchEnabled, setWebSearchEnabled] = useState(false);
     const [apiKeys, setApiKeys] = useState({});
-
-    // New state for MCP selection
-    const [selectedMcpServerName, setSelectedMcpServerName] = useState(null);
-    const [savedMcpConfigs, setSavedMcpConfigs] = useState([]);
 
     // Use effect to handle user data changes
     useEffect(() => {
@@ -197,17 +233,10 @@ const AdminChat = () => {
             const fileUrls = gptData.knowledgeFiles?.map(file => file.fileUrl).filter(url =>
                 url && (url.startsWith('http://') || url.startsWith('https://'))
             ) || [];
-
-            const useHybridSearch = gptData.capabilities?.hybridSearch || false;
             
             // Get API keys from backend instead of localStorage
             const apiKeys = await fetchApiKeysFromBackend();
             console.log("Fetched API keys from backend:", Object.keys(apiKeys));
-
-            console.log("GPT MCP settings:", {
-                mcpEnabled: gptData.mcpEnabled,
-                mcpSchemaLength: gptData.mcpSchema?.length || 0
-            });
 
             const response = await axios.post(
                 `${PYTHON_URL}/gpt-opened`,
@@ -216,14 +245,10 @@ const AdminChat = () => {
                     gpt_name: gptData.name,
                     gpt_id: gptData._id,
                     file_urls: fileUrls,
-                    use_hybrid_search: useHybridSearch,
                     schema: {
                         model: gptData.model,
                         instructions: gptData.instructions,
-                        capabilities: gptData.capabilities,
-                        use_hybrid_search: useHybridSearch,
-                        mcpEnabled: gptData.mcpEnabled || false,
-                        mcpSchema: gptData.mcpSchema || null
+                        capabilities: gptData.capabilities
                     },
                     api_keys: apiKeys
                 },
@@ -257,7 +282,6 @@ const AdminChat = () => {
             setMessages([]);
             setConversationMemory([]);
             setIsInitialLoading(false);
-            setSelectedMcpServerName(null);
             return;
         }
         if (authLoading) {
@@ -269,14 +293,12 @@ const AdminChat = () => {
             setGptData({ _id: gptId, name: "Admin Chat", description: "Admin user required.", model: "gpt-4o-mini" });
             setMessages([]);
             setConversationMemory([]);
-            setSelectedMcpServerName(null);
             return;
         }
         if (user.role !== 'admin') {
             console.warn("AdminChat: Non-admin user trying to access.");
             setIsInitialLoading(false);
             navigate('/user/collections');
-            setSelectedMcpServerName(null);
             return;
         }
 
@@ -296,14 +318,10 @@ const AdminChat = () => {
                     const sanitizedGptName = (fetchedGptData.name || 'gpt').replace(/[^a-zA-Z0-9]/g, '_');
                     setCollectionName(`kb_${sanitizedEmail}_${sanitizedGptName}_${gptId}`);
                     notifyGptOpened(fetchedGptData, user).catch(err => console.warn("[AdminChat] Notify error:", err));
-
-                    setSelectedMcpServerName(null);
-
                 } else {
                     console.warn("[AdminChat] Failed GPT fetch:", gptResponse.data);
                     fetchedGptData = { _id: gptId, name: "Assistant", description: "Details unavailable.", model: "gpt-4o-mini" };
                     setGptData(fetchedGptData);
-                    setSelectedMcpServerName(null);
                 }
 
                 if (currentConversationId) {
@@ -342,7 +360,6 @@ const AdminChat = () => {
                 setGptData(fetchedGptData || { _id: gptId, name: "Assistant", description: "Error loading data.", model: "gpt-4o-mini" });
                 setMessages([{ id: Date.now(), role: 'system', content: `Error loading chat data: ${err.message}`, timestamp: new Date() }]);
                 setConversationMemory([]);
-                setSelectedMcpServerName(null);
             } finally {
                 setIsInitialLoading(false);
             }
@@ -354,7 +371,7 @@ const AdminChat = () => {
             setIsInitialLoading(false);
             setLoading(prev => ({ ...prev, message: false }));
         };
-    }, [gptId, user, authLoading, currentConversationId, navigate]);
+    }, [gptId, user, authLoading, currentConversationId]);
 
     const handlePromptClick = (item) => {
         handleChatSubmit(item.prompt);
@@ -405,6 +422,8 @@ const AdminChat = () => {
         if (!message.trim()) return;
 
         try {
+            const isNewChat = messages.length === 0 && !conversationId;
+            
             // Include files in the user message
             const userMessage = {
                 id: Date.now(),
@@ -441,80 +460,27 @@ const AdminChat = () => {
             });
             setConversationMemory(updatedMemory);
 
-            const useHybridSearch = gptData?.capabilities?.hybridSearch || false;
-            const fetchedApiKeys = await fetchApiKeysFromBackend(); // Fetch latest keys
-
-            // Updated MCP logic - only handle saved MCPs:
-            const mcpEnabledForQuery = !!(gptData?.mcpEnabled && selectedMcpServerName);
-            let mcpSchemaForQuery = null;
-
-            if (mcpEnabledForQuery && selectedMcpServerName) {
-                // Find the selected saved MCP config
-                const savedConfig = savedMcpConfigs.find(c => c._id === selectedMcpServerName);
-                if (savedConfig) {
-                    // Ensure the schema is properly formatted as a JSON string
-                    try {
-                        // Parse to validate it's valid JSON, then stringify to ensure it's a string
-                        const parsedSchema = JSON.parse(savedConfig.schema);
-                        
-                        // Check if it's the full mcpServers structure or a single server config
-                        if (parsedSchema.mcpServers && typeof parsedSchema.mcpServers === 'object') {
-                            // It's the full structure, extract the first server
-                            const serverNames = Object.keys(parsedSchema.mcpServers);
-                            if (serverNames.length > 0) {
-                                const firstServerName = serverNames[0];
-                                const serverConfig = parsedSchema.mcpServers[firstServerName];
-                                // Add the server name to the config for logging
-                                serverConfig.name = savedConfig.name || firstServerName;
-                                mcpSchemaForQuery = JSON.stringify(serverConfig);
-                            } else {
-                                throw new Error("No servers found in mcpServers configuration");
-                            }
-                        } else {
-                            // It's already a single server config, just ensure it has a name
-                            parsedSchema.name = savedConfig.name;
-                            mcpSchemaForQuery = JSON.stringify(parsedSchema);
-                        }
-                        
-                        console.log("Using saved MCP schema:", selectedMcpServerName, savedConfig.name);
-                        console.log("MCP Schema being sent to backend:", mcpSchemaForQuery);
-                    } catch (parseError) {
-                        console.error("Invalid MCP schema JSON:", parseError);
-                        mcpSchemaForQuery = null;
-                        // Show error to user
-                        toast.error("Selected MCP configuration has invalid JSON format: " + parseError.message);
-                    }
-                } else {
-                    console.warn("Selected MCP config not found:", selectedMcpServerName);
-                    mcpSchemaForQuery = null;
-                }
-            }
+            // Get API keys from backend
+            const apiKeys = await fetchApiKeysFromBackend();
+            console.log("Using API keys for chat:", Object.keys(apiKeys));
 
             const payload = {
                 message,
                 gpt_id: gptId,
                 user_email: user?.email || 'unknown_admin',
                 gpt_name: gptData?.name || 'unknown_gpt',
-                user_documents: userDocuments, // These are R2 keys/URLs from file uploads to chat context
-                model: gptData?.model || 'gpt-4o-mini',
+                user_documents: userDocuments,
+                model: gptData?.model || 'openrouter/auto',
                 memory: updatedMemory,
                 history: messages.slice(-6).map(msg => ({
                     role: msg.role,
                     content: msg.content
                 })),
-                use_hybrid_search: useHybridSearch,
                 system_prompt: gptData?.instructions || null,
                 web_search_enabled: gptData?.capabilities?.webBrowsing || false,
-                mcp_enabled: mcpEnabledForQuery,
-                mcp_schema: mcpSchemaForQuery,
-                api_keys: fetchedApiKeys // Pass the fetched API keys
+                api_keys: apiKeys,
+                is_new_chat: isNewChat
             };
-            
-            console.log("Sending chat with payload:", {
-                ...payload,
-                mcp_enabled: payload.mcp_enabled,
-                mcp_schema: payload.mcp_schema ? "MCP Schema Present" : "No MCP Schema"
-            });
 
             if (!payload.user_email) {
                 payload.user_email = user?.email || 'admin@system.com';
@@ -633,11 +599,14 @@ const AdminChat = () => {
         try {
             setIsUploading(true);
             setUploadProgress(0);
-            setUploadedFiles(Array.from(files).map(file => ({
+            
+            // Show files immediately to reduce perceived latency
+            const fileObjects = Array.from(files).map(file => ({
                 name: file.name,
                 size: file.size,
                 type: file.type
-            })));
+            }));
+            setUploadedFiles(fileObjects);
 
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
@@ -650,27 +619,15 @@ const AdminChat = () => {
             formData.append('is_user_document', 'true');
             formData.append('system_prompt', gptData?.instructions || '');
 
-            // Get API keys from backend and add to form data
+            // Simulate faster initial progress (psychological trick to reduce perceived latency)
+            setUploadProgress(15); // Jump to 15% immediately
+            setTimeout(() => setUploadProgress(30), 100); // 30% after 100ms
+            
+            // Get API keys from backend
             const apiKeys = await fetchApiKeysFromBackend();
             formData.append('api_keys', JSON.stringify(apiKeys));
 
-            const startTime = Date.now();
-            const uploadDuration = 1500;
-            const progressInterval = setInterval(() => {
-                const elapsed = Date.now() - startTime;
-                if (elapsed < uploadDuration) {
-                    const progress = Math.min(60, (elapsed / uploadDuration) * 60);
-                    setUploadProgress(progress);
-                } else {
-                    setUploadProgress(prev => {
-                        if (prev < 90) {
-                            return prev + (90 - prev) * 0.08;
-                        }
-                        return prev;
-                    });
-                }
-            }, 100);
-
+            // Use a higher timeout and buffer to ensure large file uploads complete
             const response = await axios.post(
                 `${PYTHON_URL}/upload-chat-files`,
                 formData,
@@ -678,18 +635,18 @@ const AdminChat = () => {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
+                    timeout: 60000, // 60 seconds timeout
                     onUploadProgress: (progressEvent) => {
                         const percentCompleted = Math.round(
                             (progressEvent.loaded * 60) / (progressEvent.total || 100)
                         );
-                        setUploadProgress(Math.min(percentCompleted, 60));
+                        setUploadProgress(30 + Math.min(percentCompleted, 60)); // Start from 30% to 90%
                     }
                 }
             );
 
-            clearInterval(progressInterval);
             setUploadProgress(100);
-            setTimeout(() => setIsUploading(false), 500);
+            setTimeout(() => setIsUploading(false), 200); // Shorter delay before hiding
 
             if (response.data.success) {
                 setUserDocuments(response.data.file_urls || []);
@@ -699,6 +656,13 @@ const AdminChat = () => {
         } catch (error) {
             console.error("Error uploading files:", error);
             setIsUploading(false);
+            // Show error to user
+            setMessages(prev => [...prev, {
+                id: Date.now(),
+                role: 'system',
+                content: `Error uploading files: ${error.message}`,
+                timestamp: new Date()
+            }]);
         }
     };
 
@@ -748,10 +712,22 @@ const AdminChat = () => {
         let doneStreaming = false;
         let sourcesInfo = null;
         let streamError = null;
+        let progressMessages = "";
+        let hasReceivedContent = false;
 
         const messageId = streamingMessage?.id || Date.now();
 
         try {
+            // Create initial progress message
+            setStreamingMessage({
+                id: messageId,
+                role: 'assistant',
+                content: "🔍 Searching for information...",
+                isStreaming: true,
+                isProgress: true,
+                timestamp: new Date()
+            });
+
             while (!doneStreaming) {
                 const { done, value } = await reader.read();
 
@@ -786,16 +762,66 @@ const AdminChat = () => {
                         }
 
                         if (parsed.type === 'content') {
-                            buffer += parsed.data;
-                            setStreamingMessage(prev =>
-                                prev ? { ...prev, content: buffer, isStreaming: true, isError: false } :
-                                    { id: messageId, role: 'assistant', content: buffer, isStreaming: true, isError: false, timestamp: new Date() }
-                            );
+                            hasReceivedContent = true;
+                            // If we were showing progress and now getting content, start fresh with content
+                            if (progressMessages && !buffer) {
+                                buffer = parsed.data;
+                                setStreamingMessage({
+                                    id: messageId,
+                                    role: 'assistant',
+                                    content: buffer,
+                                    isStreaming: true,
+                                    isProgress: false,
+                                    timestamp: new Date()
+                                });
+                            } else {
+                                buffer += parsed.data;
+                                setStreamingMessage(prev =>
+                                    prev ? { 
+                                        ...prev, 
+                                        content: buffer, 
+                                        isStreaming: true, 
+                                        isProgress: false, 
+                                        isError: false 
+                                    } : { 
+                                        id: messageId, 
+                                        role: 'assistant', 
+                                        content: buffer, 
+                                        isStreaming: true, 
+                                        isProgress: false, 
+                                        isError: false, 
+                                        timestamp: new Date() 
+                                    }
+                                );
+                            }
+                        }
+
+                        // Show progress updates
+                        if (parsed.type === 'progress') {
+                            progressMessages += progressMessages ? `\n• ${parsed.data}` : `🔍 Searching for information...\n• ${parsed.data}`;
+                            // Only update with progress if we haven't received actual content yet
+                            if (!hasReceivedContent) {
+                                setStreamingMessage(prev => ({
+                                    ...prev,
+                                    content: progressMessages,
+                                    isStreaming: true,
+                                    isProgress: true
+                                }));
+                            }
                         }
 
                         if (parsed.type === 'sources_info') {
                             sourcesInfo = parsed.data;
-                            buffer += `\n\n[Sources Retrieved: ${sourcesInfo.documents_retrieved_count} documents, ${sourcesInfo.retrieval_time_ms}ms]`;
+                            // Only update with progress if we haven't received actual content yet
+                            if (!hasReceivedContent) {
+                                progressMessages += `\n\n[Sources: ${sourcesInfo.documents_retrieved_count} documents, ${sourcesInfo.retrieval_time_ms}ms]`;
+                                setStreamingMessage(prev => ({
+                                    ...prev,
+                                    content: progressMessages,
+                                    isStreaming: true,
+                                    isProgress: true
+                                }));
+                            }
                         }
                     } catch (e) {
                         console.error(`[Stream ${messageId}] Error parsing line:`, e, "Line:", line);
@@ -803,18 +829,25 @@ const AdminChat = () => {
                 }
             }
 
-            if (!buffer && !streamError) {
+            // Only show the "no response" message if we truly have no content
+            if (!buffer && !hasReceivedContent && !streamError) {
                 console.warn(`[Stream ${messageId}] Stream ended with no content.`);
                 buffer = "No response generated. Please try rephrasing your query or check the uploaded documents.";
                 streamError = true;
             }
 
+            // Ensure we have content in the buffer - use progress messages if that's all we have
+            if (!buffer && progressMessages) {
+                buffer = `I searched your documents but couldn't generate a good response. Here's what I found:\n\n${progressMessages}`;
+            }
+
             setStreamingMessage(prev =>
                 prev ? {
                     ...prev,
-                    content: buffer,
+                    content: buffer || prev.content,
                     isStreaming: false,
                     isLoading: false,
+                    isProgress: false,
                     isError: !!streamError
                 } : {
                     id: messageId,
@@ -822,6 +855,7 @@ const AdminChat = () => {
                     content: buffer,
                     isStreaming: false,
                     isLoading: false,
+                    isProgress: false,
                     isError: !!streamError,
                     timestamp: new Date()
                 }
@@ -867,7 +901,6 @@ const AdminChat = () => {
 
     // Determine if the web search toggle should be shown
     const showWebSearchToggle = gptData?.capabilities?.webBrowsing || false;
-    const showMcpSelector = gptData?.mcpEnabled && savedMcpConfigs.length > 0;
 
     const handleNewChat = () => {
         setMessages([]);
@@ -875,22 +908,13 @@ const AdminChat = () => {
         setHasInteracted(false);
         setUserDocuments([]);
         setUploadedFiles([]);
-    };
-
-    useEffect(() => {
-        if (gptData?.mcpEnabled) {
-            fetchSavedMcpConfigs();
-        }
-    }, [gptData?.mcpEnabled]);
-
-    const fetchSavedMcpConfigs = async () => {
-        try {
-            const response = await axiosInstance.get('/api/mcp-configs', { withCredentials: true });
-            if (response.data?.success) {
-                setSavedMcpConfigs(response.data.mcpConfigs || []);
-            }
-        } catch (error) {
-            console.error("Error fetching saved MCP configurations:", error);
+        setConversationId(null); // Reset conversation ID
+        
+        // Also tell the backend to clear memory for this session
+        if (gptData && userData) {
+            const sessionId = `user_${userData.email.replace('@', '_').replace('.', '_')}_gpt_${gptData._id}`;
+            // No need to make a separate request, the next query will include is_new_chat=true
+            console.log(`Starting new chat for session ${sessionId}`);
         }
     };
 
@@ -923,41 +947,17 @@ const AdminChat = () => {
                                 <span className="mr-1">New Chat</span>
                                 {gptData.model && (
                                     <div className="flex items-center ml-2 text-xs md:text-sm px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                                        {modelIcons[getDisplayModelName(gptData.model)] || null}
-                                        <span>{getDisplayModelName(gptData.model) === 'gpt-4o-mini' ? 'GPT-4o Mini' : getDisplayModelName(gptData.model)}</span>
+                                        {modelIcons[gptData.model === 'openrouter/auto' ? 'router-engine' : gptData.model] || null}
+                                        <span>{gptData.model === 'openrouter/auto' ? 'router-engine' : (gptData.model === 'gpt-4o-mini' ? 'GPT-4o Mini' : gptData.model)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Updated MCP Server Selector - only show saved MCPs */}
-                        {gptData?.mcpEnabled && savedMcpConfigs.length > 0 && (
-                            <div className="relative flex items-center">
-                                <FaServer className={`mr-1 ${selectedMcpServerName ? 'text-black' : 'text-black dark:text-white'}`} size={14} />
-                                <select
-                                    value={selectedMcpServerName || ""}
-                                    onChange={(e) => setSelectedMcpServerName(e.target.value || null)}
-                                    className={`border rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none pr-7 ${
-                                        selectedMcpServerName 
-                                            ? 'bg-black dark:bg-gray-800 text-green-500 dark:text-green-500 '
-                                            : 'bg-black dark:bg-gray-700 text-white dark:text-white'
-                                    }`}
-                                    title="Select MCP Server"
-                                >
-                                    <option value="">No MCP</option>
-                                    {savedMcpConfigs.map(config => (
-                                        <option key={config._id} value={config._id}>
-                                            {config.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <TbRouter className="absolute right-2 top-1/2 transform -translate-y-1/2 text-black dark:text-white bg-white dark:bg-black/10 pointer-events-none" size={14}/>
-                            </div>
-                        )}
                         <button
                             onClick={toggleTheme}
-                            className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
                             {isDarkMode ? 
@@ -1152,54 +1152,66 @@ const AdminChat = () => {
 
                                 {streamingMessage ? (
                                     <div className="flex justify-start">
-                                        <div className="w-full max-w-3xl rounded-2xl px-4 py-2 assistant-message text-black dark:text-white rounded-bl-none">
+                                        <div className={`w-full max-w-3xl rounded-2xl px-4 py-2 assistant-message text-black dark:text-white rounded-bl-none ${streamingMessage.isProgress ? 'progress-message' : ''}`}>
                                             <div className="markdown-content">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm]}
-                                                    rehypePlugins={[rehypeRaw]}
-                                                    components={{
-                                                        h1: ({ node, ...props }) => <h1 className="text-xl font-bold my-3" {...props} />,
-                                                        h2: ({ node, ...props }) => <h2 className="text-lg font-bold my-2" {...props} />,
-                                                        h3: ({ node, ...props }) => <h3 className="text-md font-bold my-2" {...props} />,
-                                                        h4: ({ node, ...props }) => <h4 className="font-bold my-2" {...props} />,
-                                                        p: ({ node, ...props }) => <p className="my-2" {...props} />,
-                                                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-2" {...props} />,
-                                                        ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-2" {...props} />,
-                                                        li: ({ node, index, ...props }) => <li key={index} className="my-1" {...props} />,
-                                                        a: ({ node, ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
-                                                        blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-3 italic" {...props} />,
-                                                        code({ node, inline, className, children, ...props }) {
-                                                            const match = /language-(\w+)/.exec(className || '');
-                                                            return !inline && match ? (
-                                                                <SyntaxHighlighter
-                                                                    style={atomDark}
-                                                                    language={match[1]}
-                                                                    PreTag="div"
-                                                                    className="rounded-md my-3"
-                                                                    {...props}
-                                                                >
-                                                                    {String(children).replace(/\n$/, '')}
-                                                                </SyntaxHighlighter>
-                                                            ) : (
-                                                                <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
-                                                                    {children}
-                                                                </code>
-                                                            );
-                                                        },
-                                                        table: ({ node, ...props }) => (
-                                                            <div className="overflow-x-auto my-3">
-                                                                <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                                {streamingMessage.isProgress ? (
+                                                    // Progress message with animation
+                                                    <div>
+                                                        {streamingMessage.content.split('\n').map((line, i) => (
+                                                            <div key={i} className={`progress-item ${i > 0 ? 'mt-1' : ''}`} style={{animationDelay: `${i * 0.1}s`}}>
+                                                                {line}
                                                             </div>
-                                                        ),
-                                                        thead: ({ node, ...props }) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
-                                                        tbody: ({ node, ...props }) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
-                                                        tr: ({ node, ...props }) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
-                                                        th: ({ node, ...props }) => <th className="px-4 py-2 text-left font-medium" {...props} />,
-                                                        td: ({ node, ...props }) => <td className="px-4 py-2" {...props} />,
-                                                    }}
-                                                >
-                                                    {streamingMessage.content}
-                                                </ReactMarkdown>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    // Regular markdown content
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        rehypePlugins={[rehypeRaw]}
+                                                        components={{
+                                                            h1: ({ node, ...props }) => <h1 className="text-xl font-bold my-3" {...props} />,
+                                                            h2: ({ node, ...props }) => <h2 className="text-lg font-bold my-2" {...props} />,
+                                                            h3: ({ node, ...props }) => <h3 className="text-md font-bold my-2" {...props} />,
+                                                            h4: ({ node, ...props }) => <h4 className="font-bold my-2" {...props} />,
+                                                            p: ({ node, ...props }) => <p className="my-2" {...props} />,
+                                                            ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-2" {...props} />,
+                                                            ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-2" {...props} />,
+                                                            li: ({ node, index, ...props }) => <li key={index} className="my-1" {...props} />,
+                                                            a: ({ node, ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
+                                                            blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-3 italic" {...props} />,
+                                                            code({ node, inline, className, children, ...props }) {
+                                                                const match = /language-(\w+)/.exec(className || '');
+                                                                return !inline && match ? (
+                                                                    <SyntaxHighlighter
+                                                                        style={atomDark}
+                                                                        language={match[1]}
+                                                                        PreTag="div"
+                                                                        className="rounded-md my-3"
+                                                                        {...props}
+                                                                    >
+                                                                        {String(children).replace(/\n$/, '')}
+                                                                    </SyntaxHighlighter>
+                                                                ) : (
+                                                                    <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
+                                                                        {children}
+                                                                    </code>
+                                                                );
+                                                            },
+                                                            table: ({ node, ...props }) => (
+                                                                <div className="overflow-x-auto my-3">
+                                                                    <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                                                </div>
+                                                            ),
+                                                            thead: ({ node, ...props }) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
+                                                            tbody: ({ node, ...props }) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
+                                                            tr: ({ node, ...props }) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
+                                                            th: ({ node, ...props }) => <th className="px-4 py-2 text-left font-medium" {...props} />,
+                                                            td: ({ node, ...props }) => <td className="px-4 py-2" {...props} />,
+                                                        }}
+                                                    >
+                                                        {streamingMessage.content}
+                                                    </ReactMarkdown>
+                                                )}
 
                                                 {streamingMessage.isStreaming && (
                                                     <div className="typing-animation mt-2 inline-flex items-center text-gray-400">

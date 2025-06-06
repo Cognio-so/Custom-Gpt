@@ -18,8 +18,6 @@ import { FaRobot } from 'react-icons/fa6';
 import { BiLogoMeta } from 'react-icons/bi';
 import { RiOpenaiFill } from 'react-icons/ri';
 import { RiMoonFill, RiSunFill } from 'react-icons/ri';
-import { FaServer } from 'react-icons/fa';
-import { TbRouter } from 'react-icons/tb';
 
 const pythonApiUrl = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
@@ -161,6 +159,22 @@ const MarkdownStyles = () => (
             background-color: #1e1e1e;
         }
 
+        .progress-message {
+            border-left: 3px solid #3498db;
+            padding-left: 10px;
+            color: #555;
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+
+        .progress-item {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .typing-animation {
             display: inline-flex;
             align-items: center;
@@ -230,8 +244,6 @@ const UserChat = () => {
     const messagesEndRef = useRef(null);
     const [webSearchEnabled, setWebSearchEnabled] = useState(false);
     const [apiKeys, setApiKeys] = useState({});
-    const [selectedMcpServerName, setSelectedMcpServerName] = useState(null);
-    const [savedMcpConfigs, setSavedMcpConfigs] = useState([]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -315,30 +327,37 @@ const UserChat = () => {
     }, [user]);
 
     useEffect(() => {
+        // --- Step 1: Basic Guard Clauses ---
         if (!gptId) {
+            // If there's no GPT ID, clear everything and stop.
             setGptData(null);
             setMessages([]);
             setConversationMemory([]);
             setIsInitialLoading(false);
-            setSelectedMcpServerName(null);
-            return;
-        }
-        if (authLoading) {
-            setIsInitialLoading(true);
-            setSelectedMcpServerName(null);
-            return;
-        }
-        if (!authLoading && !user) {
-            console.warn("Auth finished, but no user. Aborting fetch.");
-            setIsInitialLoading(false);
-            setGptData({ _id: gptId, name: "GPT Assistant", description: "Login required to load chat.", model: "gpt-4o-mini" });
-            setMessages([]);
-            setConversationMemory([]);
-            setSelectedMcpServerName(null);
             return;
         }
 
-        setIsInitialLoading(true);
+        // --- Step 2: Wait for Authentication to Settle ---
+        // If authentication is still loading, do nothing yet. Show loading indicator.
+        if (authLoading) {
+            setIsInitialLoading(true); // Keep showing loading while waiting
+            return;
+        }
+
+        // --- Step 3: Handle Post-Auth State (User Loaded or Not) ---
+        // If auth is finished, but there's no user, stop loading and show appropriate message.
+        if (!authLoading && !user) {
+            console.warn("Auth finished, but no user. Aborting fetch.");
+            setIsInitialLoading(false); // Stop loading
+            setGptData({ _id: gptId, name: "GPT Assistant", description: "Login required to load chat.", model: "gpt-4o-mini" });
+            setMessages([]);
+            setConversationMemory([]);
+            return;
+        }
+
+        // --- Step 4: Conditions Met - Proceed with Fetch ---
+        // If we reach here: gptId exists, authLoading is false, and user exists.
+        setIsInitialLoading(true); // Ensure loading is true before fetch starts
 
         const fromHistory = location.state?.fromHistory || location.search.includes('loadHistory=true');
 
@@ -349,6 +368,7 @@ const UserChat = () => {
             let historyMemory = [];
 
             try {
+                // Fetch GPT Data
                 const gptResponse = await axiosInstance.get(`/api/custom-gpts/user/assigned/${gptId}`, { withCredentials: true });
 
                 if (gptResponse.data?.success && gptResponse.data.customGpt) {
@@ -359,17 +379,20 @@ const UserChat = () => {
                     fetchedGptData = { _id: gptId, name: "GPT Assistant", description: "Assistant details unavailable.", model: "gpt-4o-mini" };
                 }
 
+                // Set GPT Data *before* history load
                 setGptData(fetchedGptData);
                 const sanitizedEmail = (user.email || 'user').replace(/[^a-zA-Z0-9]/g, '_');
                 const sanitizedGptName = (fetchedGptData.name || 'gpt').replace(/[^a-zA-Z0-9]/g, '_');
                 setCollectionName(`kb_${sanitizedEmail}_${sanitizedGptName}_${gptId}`);
                 notifyGptOpened(fetchedGptData, user).catch(err => console.warn("[fetchInitialData] Notify error:", err));
 
+                // Load History if needed
                 if (fromHistory) {
                     const historyResponse = await axiosInstance.get(`/api/chat-history/conversation/${user._id}/${gptDataIdToLoad}`, { withCredentials: true });
 
                     if (historyResponse.data?.success && historyResponse.data.conversation?.messages?.length > 0) {
                         const { conversation } = historyResponse.data;
+                        // Use a more robust unique key if possible, combining conv id and timestamp/index
                         historyMessages = conversation.messages.map((msg, index) => ({
                             id: `${conversation._id}-${index}-${msg.timestamp || Date.now()}`,
                             role: msg.role,
@@ -390,10 +413,9 @@ const UserChat = () => {
                     historyMemory = [];
                 }
 
+                // Set Messages & Memory *after* all fetches are done
                 setMessages(historyMessages);
                 setConversationMemory(historyMemory);
-
-                setSelectedMcpServerName(null);
 
             } catch (err) {
                 console.error("[fetchInitialData] Error during fetch:", err);
@@ -401,36 +423,22 @@ const UserChat = () => {
                 setCollectionName(`kb_user_${gptId}`);
                 setMessages([]);
                 setConversationMemory([]);
-                setSelectedMcpServerName(null);
             } finally {
+                // Mark initial loading complete *only* after try/catch finishes
                 setIsInitialLoading(false);
             }
         };
 
-        fetchInitialData();
+        fetchInitialData(); // Execute the fetch logic
 
+        // Cleanup function: Reset loading states if dependencies change mid-fetch
         return () => {
             setIsInitialLoading(false);
-            setLoading(prev => ({ ...prev, gpt: false, history: false }));
+            setLoading(prev => ({ ...prev, gpt: false, history: false })); // Clear old flags too
         };
-    }, [gptId, user, authLoading, location.state, location.search]);
 
-    useEffect(() => {
-        if (gptData?.mcpEnabled) {
-            fetchSavedMcpConfigs();
-        }
-    }, [gptData?.mcpEnabled]);
-
-    const fetchSavedMcpConfigs = async () => {
-        try {
-            const response = await axiosInstance.get('/api/mcp-configs', { withCredentials: true });
-            if (response.data?.success) {
-                setSavedMcpConfigs(response.data.mcpConfigs || []);
-            }
-        } catch (error) {
-            console.error("Error fetching saved MCP configurations:", error);
-        }
-    };
+        // Dependencies: Only re-run if these core identifiers change.
+    }, [gptId, user, authLoading, location.state, location.search]); // Keep authLoading & user to trigger run *after* auth resolves
 
     const predefinedPrompts = [
         {
@@ -482,6 +490,7 @@ const UserChat = () => {
             return response.data;
         } catch (error) {
             console.error(`Error saving ${role} message to history:`, error.response?.data || error.message);
+            // Return null instead of throwing to prevent breaking the chat flow
             return null;
         }
     };
@@ -489,71 +498,44 @@ const UserChat = () => {
     const handleChatSubmit = async (message) => {
         if (!message.trim()) return;
 
+        // Set interaction flag to hide files
         setHasInteracted(true);
 
         try {
+            // Include files in the user message
             const userMessage = {
                 id: Date.now(),
                 role: 'user',
                 content: message,
-                timestamp: new Date()
+                timestamp: new Date(),
+                files: uploadedFiles.length > 0 ? [...uploadedFiles] : []
             };
 
             setMessages(prev => [...prev, userMessage]);
             saveMessageToHistory(message, 'user');
+
+            // Save current files for this message then clear them for next message
+            const currentFiles = [...uploadedFiles];
+            if (uploadedFiles.length > 0) {
+                setUploadedFiles([]); // Clear files after using them
+            }
 
             const recentHistory = [...conversationMemory, { role: 'user', content: message }]
                 .slice(-10)
                 .map(msg => ({ role: msg.role, content: msg.content }));
 
             setConversationMemory(prev => [...prev, { role: 'user', content: message, timestamp: new Date() }].slice(-10));
+            
+            // Important: Clear any existing streaming message first
             setStreamingMessage(null);
+            
+            // Then set loading state
             setLoading(prev => ({ ...prev, message: true }));
 
+            // Use stored API keys instead of fetching again
             console.log("Using API keys for chat:", Object.keys(apiKeys));
 
             try {
-                const mcpEnabledForQuery = !!(gptData?.mcpEnabled && selectedMcpServerName);
-                let mcpSchemaForQuery = null;
-
-                if (mcpEnabledForQuery && selectedMcpServerName) {
-                    const savedConfig = savedMcpConfigs.find(c => c._id === selectedMcpServerName);
-                    if (savedConfig) {
-                        try {
-                            const parsedSchema = JSON.parse(savedConfig.schema);
-                            
-                            // Check if it's the full mcpServers structure or a single server config
-                            if (parsedSchema.mcpServers && typeof parsedSchema.mcpServers === 'object') {
-                                // It's the full structure, extract the first server
-                                const serverNames = Object.keys(parsedSchema.mcpServers);
-                                if (serverNames.length > 0) {
-                                    const firstServerName = serverNames[0];
-                                    const serverConfig = parsedSchema.mcpServers[firstServerName];
-                                    // Add the server name to the config for logging
-                                    serverConfig.name = savedConfig.name || firstServerName;
-                                    mcpSchemaForQuery = JSON.stringify(serverConfig);
-                                } else {
-                                    throw new Error("No servers found in mcpServers configuration");
-                                }
-                            } else {
-                                // It's already a single server config, just ensure it has a name
-                                parsedSchema.name = savedConfig.name;
-                                mcpSchemaForQuery = JSON.stringify(parsedSchema);
-                            }
-                            
-                            console.log("Using saved MCP schema:", selectedMcpServerName, savedConfig.name);
-                            console.log("MCP Schema being sent to backend:", mcpSchemaForQuery);
-                        } catch (parseError) {
-                            console.error("Invalid MCP schema JSON:", parseError);
-                            mcpSchemaForQuery = null;
-                            console.error("Selected MCP configuration has invalid JSON format: " + parseError.message);
-                        }
-                    } else {
-                        console.warn("Selected MCP config not found:", selectedMcpServerName);
-                        mcpSchemaForQuery = null;
-                    }
-                }
-
                 const payload = {
                     message: message,
                     gpt_id: gptId,
@@ -562,19 +544,11 @@ const UserChat = () => {
                     history: recentHistory,
                     memory: conversationMemory,
                     user_documents: userDocuments,
-                    use_hybrid_search: gptData?.capabilities?.hybridSearch || false,
                     system_prompt: gptData?.instructions || null,
                     web_search_enabled: webSearchEnabled && gptData?.capabilities?.webBrowsing || false,
-                    api_keys: apiKeys,
-                    mcp_enabled: mcpEnabledForQuery,
-                    mcp_schema: mcpSchemaForQuery,
+                    model: gptData?.model || 'openrouter/auto',
+                    api_keys: apiKeys // Use stored keys
                 };
-
-                console.log("Sending chat with payload:", {
-                    ...payload,
-                    mcp_enabled: payload.mcp_enabled,
-                    mcp_schema: payload.mcp_schema ? "MCP Schema Present" : "No MCP Schema"
-                });
 
                 const response = await fetch(`${pythonApiUrl}/chat-stream`, {
                     method: 'POST',
@@ -620,16 +594,19 @@ const UserChat = () => {
         let doneStreaming = false;
         let sourcesInfo = null;
         let streamError = null;
+        let progressMessages = "";
+        let hasReceivedContent = false;
 
-        const messageId = Date.now() + 1;
+        const messageId = streamingMessage?.id || Date.now();
 
         try {
+            // Create initial progress message
             setStreamingMessage({
                 id: messageId,
                 role: 'assistant',
-                content: '',
+                content: "🔍 Searching for information...",
                 isStreaming: true,
-                isError: false,
+                isProgress: true,
                 timestamp: new Date()
             });
 
@@ -654,12 +631,10 @@ const UserChat = () => {
                             console.error(`[Stream ${messageId}] Streaming Error:`, streamError);
                             buffer = `Error: ${streamError}`;
                             doneStreaming = true;
-                            setStreamingMessage(prev => ({
-                                ...prev,
-                                content: buffer,
-                                isStreaming: false,
-                                isError: true
-                            }));
+                            setStreamingMessage(prev =>
+                                prev ? { ...prev, content: buffer, isStreaming: false, isError: true } :
+                                    { id: messageId, role: 'assistant', content: buffer, isStreaming: false, isError: true, timestamp: new Date() }
+                            );
                             break;
                         }
 
@@ -669,18 +644,66 @@ const UserChat = () => {
                         }
 
                         if (parsed.type === 'content') {
-                            buffer += parsed.data;
-                            setStreamingMessage(prev => ({
-                                ...prev,
-                                content: buffer,
-                                isStreaming: true,
-                                isError: false
-                            }));
+                            hasReceivedContent = true;
+                            // If we were showing progress and now getting content, start fresh with content
+                            if (progressMessages && !buffer) {
+                                buffer = parsed.data;
+                                setStreamingMessage({
+                                    id: messageId,
+                                    role: 'assistant',
+                                    content: buffer,
+                                    isStreaming: true,
+                                    isProgress: false,
+                                    timestamp: new Date()
+                                });
+                            } else {
+                                buffer += parsed.data;
+                                setStreamingMessage(prev =>
+                                    prev ? { 
+                                        ...prev, 
+                                        content: buffer, 
+                                        isStreaming: true, 
+                                        isProgress: false, 
+                                        isError: false 
+                                    } : { 
+                                        id: messageId, 
+                                        role: 'assistant', 
+                                        content: buffer, 
+                                        isStreaming: true, 
+                                        isProgress: false, 
+                                        isError: false, 
+                                        timestamp: new Date() 
+                                    }
+                                );
+                            }
+                        }
+
+                        // Show progress updates
+                        if (parsed.type === 'progress') {
+                            progressMessages += progressMessages ? `\n• ${parsed.data}` : `🔍 Searching for information...\n• ${parsed.data}`;
+                            // Only update with progress if we haven't received actual content yet
+                            if (!hasReceivedContent) {
+                                setStreamingMessage(prev => ({
+                                    ...prev,
+                                    content: progressMessages,
+                                    isStreaming: true,
+                                    isProgress: true
+                                }));
+                            }
                         }
 
                         if (parsed.type === 'sources_info') {
                             sourcesInfo = parsed.data;
-                            buffer += `\n\n[Sources Retrieved: ${sourcesInfo.documents_retrieved_count} documents, ${sourcesInfo.retrieval_time_ms}ms]`;
+                            // Only update with progress if we haven't received actual content yet
+                            if (!hasReceivedContent) {
+                                progressMessages += `\n\n[Sources: ${sourcesInfo.documents_retrieved_count} documents, ${sourcesInfo.retrieval_time_ms}ms]`;
+                                setStreamingMessage(prev => ({
+                                    ...prev,
+                                    content: progressMessages,
+                                    isStreaming: true,
+                                    isProgress: true
+                                }));
+                            }
                         }
                     } catch (e) {
                         console.error(`[Stream ${messageId}] Error parsing line:`, e, "Line:", line);
@@ -688,33 +711,46 @@ const UserChat = () => {
                 }
             }
 
-            if (!buffer && !streamError) {
+            // Only show the "no response" message if we truly have no content
+            if (!buffer && !hasReceivedContent && !streamError) {
                 console.warn(`[Stream ${messageId}] Stream ended with no content.`);
                 buffer = "No response generated. Please try rephrasing your query or check the uploaded documents.";
                 streamError = true;
             }
 
-            setStreamingMessage(prev => ({
-                ...prev,
-                content: buffer,
-                isStreaming: false,
-                isLoading: false,
-                isError: !!streamError
-            }));
+            // Ensure we have content in the buffer - use progress messages if that's all we have
+            if (!buffer && progressMessages) {
+                buffer = `I searched your documents but couldn't generate a good response. Here's what I found:\n\n${progressMessages}`;
+            }
+
+            setStreamingMessage(prev =>
+                prev ? {
+                    ...prev,
+                    content: buffer || prev.content,
+                    isStreaming: false,
+                    isLoading: false,
+                    isProgress: false,
+                    isError: !!streamError
+                } : {
+                    id: messageId,
+                    role: 'assistant',
+                    content: buffer,
+                    isStreaming: false,
+                    isLoading: false,
+                    isProgress: false,
+                    isError: !!streamError,
+                    timestamp: new Date()
+                }
+            );
 
             await saveMessageToHistory(buffer, 'assistant');
         } catch (err) {
             console.error(`[Stream ${messageId}] Error reading stream:`, err);
             buffer = `Error reading response stream: ${err.message}`;
-            setStreamingMessage({
-                id: messageId,
-                role: 'assistant',
-                content: buffer,
-                isStreaming: false,
-                isLoading: false,
-                isError: true,
-                timestamp: new Date()
-            });
+            setStreamingMessage(prev =>
+                prev ? { ...prev, content: buffer, isStreaming: false, isLoading: false, isError: true } :
+                    { id: messageId, role: 'assistant', content: buffer, isStreaming: false, isLoading: false, isError: true, timestamp: new Date() }
+            );
             await saveMessageToHistory(buffer, 'assistant');
         } finally {
             setLoading(prev => ({ ...prev, message: false }));
@@ -733,12 +769,14 @@ const UserChat = () => {
                 return [...prev, { ...streamingMessage }];
             });
 
+            // Add to conversation memory
             setConversationMemory(prev => [...prev, {
                 role: 'assistant',
                 content: streamingMessage.content,
                 timestamp: new Date().toISOString()
             }]);
 
+            // Clear streaming message with a short delay
             setTimeout(() => {
                 setStreamingMessage(null);
                 setLoading(prev => ({ ...prev, message: false }));
@@ -773,13 +811,12 @@ const UserChat = () => {
                 console.warn("Cannot notify GPT opened - user not authenticated");
                 return false;
             }
-            
-            const useHybridSearch = customGpt.capabilities?.hybridSearch || false;
 
             const fileUrls = customGpt.knowledgeFiles?.map(file => file.fileUrl).filter(url =>
                 url && (url.startsWith('http://') || url.startsWith('https://'))
             ) || [];
 
+            // Use stored API keys or fetch them if not available
             let keysToUse = Object.keys(apiKeys).length > 0 ? apiKeys : await fetchApiKeysFromBackend();
             console.log("Using API keys for GPT opened:", Object.keys(keysToUse));
 
@@ -790,12 +827,10 @@ const UserChat = () => {
                 gpt_name: customGpt.name || 'Unnamed GPT',
                 gpt_id: customGpt._id,
                 file_urls: fileUrls,
-                use_hybrid_search: useHybridSearch,
                 schema: {
-                    model: customGpt.model || "gpt-4o-mini",
+                    model: customGpt.model || "openrouter/auto",
                     instructions: customGpt.instructions || "",
-                    capabilities: customGpt.capabilities || {},
-                    use_hybrid_search: useHybridSearch
+                    capabilities: customGpt.capabilities || {}
                 },
                 api_keys: keysToUse
             };
@@ -827,17 +862,21 @@ const UserChat = () => {
         }
     };
 
+    // Update handleFileUpload function
     const handleFileUpload = async (files) => {
         if (!files.length || !gptData) return;
 
         try {
             setIsUploading(true);
             setUploadProgress(0);
-            setUploadedFiles(Array.from(files).map(file => ({
+            
+            // Show files immediately to reduce perceived latency
+            const fileObjects = Array.from(files).map(file => ({
                 name: file.name,
                 size: file.size,
                 type: file.type
-            })));
+            }));
+            setUploadedFiles(fileObjects);
 
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
@@ -851,9 +890,11 @@ const UserChat = () => {
             formData.append('is_user_document', 'true');
             formData.append('system_prompt', gptData?.instructions || '');
 
-            const useHybridSearch = gptData?.capabilities?.hybridSearch || false;
-            formData.append('use_hybrid_search', useHybridSearch.toString());
+            // Simulate faster initial progress (psychological trick to reduce perceived latency)
+            setUploadProgress(15); // Jump to 15% immediately
+            setTimeout(() => setUploadProgress(30), 100); // 30% after 100ms
 
+            // Use stored API keys
             console.log("Using API keys for file upload:", Object.keys(apiKeys));
             formData.append('api_keys', JSON.stringify(apiKeys));
 
@@ -865,17 +906,18 @@ const UserChat = () => {
                         'Content-Type': 'multipart/form-data',
                     },
                     withCredentials: true,
+                    timeout: 60000, // 60 seconds timeout
                     onUploadProgress: (progressEvent) => {
                         const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / (progressEvent.total || 100)
+                            (progressEvent.loaded * 60) / (progressEvent.total || 100)
                         );
-                        setUploadProgress(percentCompleted);
+                        setUploadProgress(30 + Math.min(percentCompleted, 60)); // Start from 30% to 90%
                     }
                 }
             );
 
             setUploadProgress(100);
-            setTimeout(() => setIsUploading(false), 500);
+            setTimeout(() => setIsUploading(false), 200); // Shorter delay before hiding
 
             if (response.data.success) {
                 setUserDocuments(response.data.file_urls || []);
@@ -894,6 +936,7 @@ const UserChat = () => {
         }
     };
 
+    // Add this helper function for file icons
     const getFileIcon = (filename) => {
         if (!filename) return <FaFile className="text-white" />;
 
@@ -912,10 +955,12 @@ const UserChat = () => {
         }
     };
 
+    // Add this function to handle removing uploaded files
     const handleRemoveUploadedFile = (indexToRemove) => {
         setUploadedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
     };
 
+    // Add a function to handle starting a new chat
     const handleNewChat = () => {
         setMessages([]);
         setConversationMemory([]);
@@ -923,8 +968,6 @@ const UserChat = () => {
         setUserDocuments([]);
         setUploadedFiles([]);
     };
-
-    const showMcpSelector = gptData?.mcpEnabled && savedMcpConfigs.length > 0;
 
     return (
         <>
@@ -942,6 +985,7 @@ const UserChat = () => {
                             </button>
                         )}
 
+                        {/* New Chat Button */}
                         <button
                             onClick={handleNewChat}
                             className={`p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
@@ -950,6 +994,7 @@ const UserChat = () => {
                             <IoAddCircleOutline size={24} />
                         </button>
 
+                        {/* Show the GPT name when it's available */}
                         {gptData && (
                             <div className="ml-2 text-sm md:text-base font-medium flex items-center">
                                 <span className="mr-1">New Chat</span>
@@ -964,34 +1009,6 @@ const UserChat = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {gptData?.mcpEnabled && savedMcpConfigs.length > 0 && (
-                            <div className="relative flex items-center">
-                                <FaServer className={`mr-1 ${selectedMcpServerName ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}`} size={14} />
-                                <select
-                                    value={selectedMcpServerName || ""}
-                                    onChange={(e) => setSelectedMcpServerName(e.target.value || null)}
-                                    className={`border rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none pr-7 ${
-                                        selectedMcpServerName 
-                                            ? (isDarkMode 
-                                                ? 'bg-green-900/20 border-green-600 text-green-200'
-                                                : 'bg-green-50 border-green-300 text-green-700')
-                                            : (isDarkMode 
-                                                ? 'bg-gray-700 border-gray-600 text-gray-200' 
-                                                : 'bg-gray-100 border-gray-300 text-gray-700')
-                                    }`}
-                                    title="Select MCP Server"
-                                >
-                                    <option value="">No MCP</option>
-                                    {savedMcpConfigs.map(config => (
-                                        <option key={config._id} value={config._id}>
-                                            {config.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <TbRouter className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none" size={14}/>
-                            </div>
-                        )}
-                        
                         <button
                             onClick={toggleTheme}
                             className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
@@ -1054,6 +1071,7 @@ const UserChat = () => {
 
                 <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                     <div className="w-full max-w-3xl mx-auto flex flex-col space-y-4">
+                        {/* --- Consolidated Initial Loading Indicator --- */}
                         {isInitialLoading ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-20">
                                 <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${isDarkMode ? 'border-blue-500' : 'border-blue-600'}`}></div>
@@ -1062,8 +1080,10 @@ const UserChat = () => {
                                 </span>
                             </div>
                         ) : messages.length === 0 ? (
+                            // Welcome Screen (Rendered only after initial load is complete and if no messages)
                             <div className="welcome-screen py-10">
                                 {gptId && gptData ? (
+                                    // GPT-specific welcome
                                     <div className="text-center">
                                         <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                                             {gptData.imageUrl ? (
@@ -1075,6 +1095,7 @@ const UserChat = () => {
                                         <h2 className={`text-xl font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{gptData.name}</h2>
                                         <p className={`max-w-md mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{gptData.description || 'Start a conversation...'}</p>
 
+                                        {/* Conversation starter */}
                                         {gptData.conversationStarter && (
                                             <div
                                                 onClick={() => handleChatSubmit(gptData.conversationStarter)}
@@ -1088,10 +1109,12 @@ const UserChat = () => {
                                         )}
                                     </div>
                                 ) : (
+                                    // Generic welcome
                                     <div className="text-center">
                                         <h1 className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>AI Assistant</h1>
                                         <p className={`text-base sm:text-lg md:text-xl font-medium mb-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>How can I assist you today?</p>
 
+                                        {/* Simplified prompts display */}
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
                                             {predefinedPrompts.map((item) => (
                                                 <div
@@ -1111,6 +1134,7 @@ const UserChat = () => {
                                 )}
                             </div>
                         ) : (
+                            // Message list (Rendered only after initial load and when messages exist)
                             <>
                                 {messages.length > 0 && (
                                     messages
@@ -1120,6 +1144,7 @@ const UserChat = () => {
                                                 key={msg.id}
                                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                             >
+                                                {/* Assistant Icon - Render if it's an assistant message */}
                                                 {msg.role === 'assistant' && (
                                                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
                                                         {gptData?.imageUrl ? (
@@ -1130,6 +1155,7 @@ const UserChat = () => {
                                                     </div>
                                                 )}
 
+                                                {/* Message content */}
                                                 <div
                                                     className={`${msg.role === 'user'
                                                         ? `${isDarkMode ? 'bg-black/10 dark:bg-white/80 text-black dark:text-black rounded-br-none' : 'bg-blue-600 text-white rounded-br-none'} max-w-max`
@@ -1140,7 +1166,33 @@ const UserChat = () => {
                                                     } rounded-2xl px-5 py-3`}
                                                 >
                                                     {msg.role === 'user' ? (
-                                                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                        <>
+                                                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                            
+                                                            {/* Display files attached to this message */}
+                                                            {msg.files && msg.files.length > 0 && (
+                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                    {msg.files.map((file, index) => (
+                                                                        <div
+                                                                            key={`${file.name}-${index}`}
+                                                                            className="flex items-center py-1 px-2 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700/50 max-w-fit"
+                                                                        >
+                                                                            <div className="mr-1.5 text-gray-500 dark:text-gray-400">
+                                                                                {getFileIcon(file.name)}
+                                                                            </div>
+                                                                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[140px]">
+                                                                                {file.name}
+                                                                            </span>
+                                                                            {file.size && (
+                                                                                <div className="text-[10px] text-gray-500 ml-1 whitespace-nowrap">
+                                                                                    {Math.round(file.size / 1024)} KB
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     ) : (
                                                         <div className="markdown-content">
                                                             <ReactMarkdown
@@ -1195,6 +1247,7 @@ const UserChat = () => {
                                                     </div>
                                                 </div>
 
+                                                {/* User Icon - Render if it's a user message */}
                                                 {msg.role === 'user' && (
                                                     <div className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden border ${isDarkMode ? 'border-white/20 bg-gray-700' : 'border-gray-300 bg-gray-300'}`}>
                                                         {userData?.profilePic ? (
@@ -1212,6 +1265,7 @@ const UserChat = () => {
                             </>
                         )}
 
+                        {/* Streaming message - displayed when streaming is active */}
                         {streamingMessage && (
                             <div className="flex justify-start items-end space-x-2">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
@@ -1224,55 +1278,67 @@ const UserChat = () => {
                                 <div
                                     className={`rounded-2xl px-4 py-2 assistant-message text-black dark:text-white rounded-bl-none w-full max-w-3xl ${
                                         streamingMessage.isError ? (isDarkMode ? 'bg-red-800/70 text-red-100' : 'bg-red-100 text-red-700') : ''
-                                    }`}
+                                    } ${streamingMessage.isProgress ? 'progress-message' : ''}`}
                                 >
                                     <div className="markdown-content">
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            rehypePlugins={[rehypeRaw]}
-                                            components={{
-                                                h1: ({ node, ...props }) => <h1 className="text-xl font-bold my-4" {...props} />,
-                                                h2: ({ node, ...props }) => <h2 className="text-lg font-bold my-3" {...props} />,
-                                                h3: ({ node, ...props }) => <h3 className="text-md font-bold my-3" {...props} />,
-                                                h4: ({ node, ...props }) => <h4 className="font-bold my-2" {...props} />,
-                                                p: ({ node, ...props }) => <p className="my-3" {...props} />,
-                                                ul: ({ node, ...props }) => <ul className="list-disc pl-6 my-3" {...props} />,
-                                                ol: ({ node, ...props }) => <ol className="list-decimal pl-6 my-3" {...props} />,
-                                                li: ({ node, index, ...props }) => <li className="my-2" key={index} {...props} />,
-                                                a: ({ node, ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
-                                                blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-4 italic" {...props} />,
-                                                code({ node, inline, className, children, ...props }) {
-                                                    const match = /language-(\w+)/.exec(className || '');
-                                                    return !inline && match ? (
-                                                        <SyntaxHighlighter
-                                                            style={atomDark}
-                                                            language={match[1]}
-                                                            PreTag="div"
-                                                            className="rounded-md my-3"
-                                                            {...props}
-                                                        >
-                                                            {String(children).replace(/\n$/, '')}
-                                                        </SyntaxHighlighter>
-                                                    ) : (
-                                                        <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
-                                                            {children}
-                                                        </code>
-                                                    );
-                                                },
-                                                table: ({ node, ...props }) => (
-                                                    <div className="overflow-x-auto my-4">
-                                                        <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                        {streamingMessage.isProgress ? (
+                                            // Progress message with animation
+                                            <div>
+                                                {streamingMessage.content.split('\n').map((line, i) => (
+                                                    <div key={i} className={`progress-item ${i > 0 ? 'mt-1' : ''}`} style={{animationDelay: `${i * 0.1}s`}}>
+                                                        {line}
                                                     </div>
-                                                ),
-                                                thead: ({ node, ...props }) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
-                                                tbody: ({ node, ...props }) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
-                                                tr: ({ node, ...props }) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
-                                                th: ({ node, ...props }) => <th className="px-4 py-3 text-left font-medium" {...props} />,
-                                                td: ({ node, ...props }) => <td className="px-4 py-3" {...props} />,
-                                            }}
-                                        >
-                                            {streamingMessage.content}
-                                        </ReactMarkdown>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            // Regular markdown content
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                rehypePlugins={[rehypeRaw]}
+                                                components={{
+                                                    h1: ({ node, ...props }) => <h1 className="text-xl font-bold my-4" {...props} />,
+                                                    h2: ({ node, ...props }) => <h2 className="text-lg font-bold my-3" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-md font-bold my-3" {...props} />,
+                                                    h4: ({ node, ...props }) => <h4 className="font-bold my-2" {...props} />,
+                                                    p: ({ node, ...props }) => <p className="my-3" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-6 my-3" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-6 my-3" {...props} />,
+                                                    li: ({ node, index, ...props }) => <li className="my-2" key={index} {...props} />,
+                                                    a: ({ node, ...props }) => <a className="text-blue-400 hover:underline" {...props} />,
+                                                    blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-gray-500 dark:border-gray-400 pl-4 my-4 italic" {...props} />,
+                                                    code({ node, inline, className, children, ...props }) {
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return !inline && match ? (
+                                                            <SyntaxHighlighter
+                                                                style={atomDark}
+                                                                language={match[1]}
+                                                                PreTag="div"
+                                                                className="rounded-md my-3"
+                                                                {...props}
+                                                            >
+                                                                {String(children).replace(/\n$/, '')}
+                                                            </SyntaxHighlighter>
+                                                        ) : (
+                                                            <code className={`${inline ? 'bg-gray-300 dark:bg-gray-600 px-1 py-0.5 rounded text-sm' : ''} ${className}`} {...props}>
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    table: ({ node, ...props }) => (
+                                                        <div className="overflow-x-auto my-4">
+                                                            <table className="min-w-full border border-gray-400 dark:border-gray-500" {...props} />
+                                                        </div>
+                                                    ),
+                                                    thead: ({ node, ...props }) => <thead className="bg-gray-300 dark:bg-gray-600" {...props} />,
+                                                    tbody: ({ node, ...props }) => <tbody className="divide-y divide-gray-400 dark:divide-gray-500" {...props} />,
+                                                    tr: ({ node, ...props }) => <tr className="hover:bg-gray-300 dark:hover:bg-gray-600" {...props} />,
+                                                    th: ({ node, ...props }) => <th className="px-4 py-3 text-left font-medium" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="px-4 py-3" {...props} />,
+                                                }}
+                                            >
+                                                {streamingMessage.content}
+                                            </ReactMarkdown>
+                                        )}
 
                                         {streamingMessage.isStreaming && (
                                             <div className="typing-animation mt-2 inline-flex items-center text-gray-400">
@@ -1289,6 +1355,7 @@ const UserChat = () => {
                             </div>
                         )}
 
+                        {/* Replace loading indicator with better styling */}
                         {!isInitialLoading && loading.message && !streamingMessage && (
                             <div className="flex justify-start">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
@@ -1310,6 +1377,7 @@ const UserChat = () => {
 
                 <div className={`flex-shrink-0 p-3  ${isDarkMode ? 'bg-black border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
                     <div className="w-full max-w-3xl mx-auto">
+                        {/* File Upload Animation */}
                         {isUploading && (
                             <div className="mb-2 px-2">
                                 <div className="flex items-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/30">
@@ -1338,6 +1406,7 @@ const UserChat = () => {
                             </div>
                         )}
 
+                        {/* Replace the existing uploaded files display with this improved version */}
                         {uploadedFiles.length > 0 && !isUploading && !hasInteracted && (
                             <div className="mb-2 flex flex-wrap gap-2">
                                 {uploadedFiles.map((file, index) => (
